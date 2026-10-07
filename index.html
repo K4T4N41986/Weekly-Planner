@@ -39,8 +39,14 @@
         .day-column:hover { border-color: var(--btn-bg); }
         .day-title { text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 1.2em; border-bottom: 2px solid var(--border-color); padding-bottom: 5px; }
         .events-list { display: flex; flex-direction: column; gap: 8px; }
-        .event-card { padding: 10px; border-radius: 6px; font-size: 0.9em; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        .event-card { padding: 10px; border-radius: 6px; font-size: 0.9em; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 5px;}
         
+        /* Event card buttons */
+        .card-actions { display: flex; gap: 5px; margin-top: 5px; }
+        .cal-btn { background-color: rgba(255, 255, 255, 0.2); color: white; border: 1px solid white; padding: 6px 10px; border-radius: 4px; cursor: pointer; flex: 1; font-size: 0.8em; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; }
+        .delete-btn { background-color: rgba(255, 0, 0, 0.5); color: white; border: 1px solid white; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8em; }
+        .cal-btn:hover { background-color: rgba(255, 255, 255, 0.4); }
+
         /* Footer navigation */
         footer { background-color: var(--header-bg); padding: 10px; display: flex; justify-content: space-between; flex-shrink: 0; }
         .nav-btn { background-color: var(--btn-bg); color: #fff; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 1em; }
@@ -53,7 +59,6 @@
         .modal-actions { display: flex; justify-content: space-between; margin-top: 10px; }
         .save-btn { background-color: #2ecc71; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 48%; }
         .cancel-btn { background-color: #e74c3c; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 48%; }
-        .delete-btn { background-color: #c0392b; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-top: 5px; width: 100%; font-size: 0.8em; }
     </style>
 </head>
 <body>
@@ -100,7 +105,7 @@
 <script>
     let currentDate = new Date();
     let events = JSON.parse(localStorage.getItem('planer_events')) || {};
-    let notifiedEvents = JSON.parse(localStorage.getItem('notified_events')) || {};
+    let notifiedEvents = JSON.parse(localStorage.getItem('notified_events')) || {}; // Zadržavamo za laptop
 
     const daysInWeek = ['Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja'];
 
@@ -111,7 +116,7 @@
         }
         updateClock();
         setInterval(updateClock, 1000);
-        setInterval(checkNotifications, 30000); // Provera svake 30 sekundi
+        setInterval(checkNotifications, 30000); // PC notifikacije ostaju
         renderWeek();
     }
 
@@ -145,6 +150,49 @@
         renderWeek();
     }
 
+    // Funkcija za kreiranje Google Calendar URL-a
+    function createGCalLink(eventData, dateString) {
+        // Formatiranje datuma za Google Calendar (YYYYMMDDTHHMMSSZ)
+        let startTime = "";
+        let endTime = "";
+        
+        if (eventData.time) {
+            // Ako imamo vreme, pretvaramo ga u UTC
+            const d = new Date(`${dateString}T${eventData.time}:00`);
+            const iso = d.toISOString().replace(/-|:|\.\d\d\d/g,""); // Pretvara 2026-10-08T12:00:00.000Z u 20261008T120000Z
+            startTime = iso;
+            
+            // Postavljamo događaj da traje 1 sat podrazumevano
+            const endD = new Date(d.getTime() + 60*60*1000);
+            endTime = endD.toISOString().replace(/-|:|\.\d\d\d/g,"");
+        } else {
+            // Ako nema vremena, pravimo celodnevni događaj
+            const d = new Date(dateString);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            startTime = `${yyyy}${mm}${dd}`;
+            
+            const nextD = new Date(d);
+            nextD.setDate(nextD.getDate() + 1);
+            const nyyyy = nextD.getFullYear();
+            const nmm = String(nextD.getMonth() + 1).padStart(2, '0');
+            const ndd = String(nextD.getDate()).padStart(2, '0');
+            endTime = `${nyyyy}${nmm}${ndd}`;
+        }
+
+        const dates = `${startTime}/${endTime}`;
+        
+        let detailsText = '';
+        if (eventData.person) detailsText += `Kontakt osoba: ${eventData.person}\n`;
+        
+        const text = encodeURIComponent(eventData.name);
+        const details = encodeURIComponent(detailsText);
+        const location = encodeURIComponent(eventData.address || '');
+
+        return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}&location=${location}`;
+    }
+
     function renderWeek() {
         const container = document.getElementById('weekContainer');
         container.innerHTML = '';
@@ -159,7 +207,8 @@
             const col = document.createElement('div');
             col.className = 'day-column';
             col.onclick = (e) => {
-                if(!e.target.classList.contains('delete-btn')) {
+                // Ne otvaraj modal ako se klikne na dugme
+                if(!e.target.classList.contains('delete-btn') && !e.target.classList.contains('cal-btn')) {
                     openModal(dateString);
                 }
             };
@@ -182,7 +231,6 @@
         list.innerHTML = '';
 
         if (events[dateString]) {
-            // Sortiranje po vremenu
             events[dateString].sort((a, b) => a.time.localeCompare(b.time));
 
             events[dateString].forEach((ev, index) => {
@@ -190,13 +238,22 @@
                 card.className = 'event-card';
                 card.style.backgroundColor = ev.color;
                 
-                let details = `<strong>${ev.time} - ${ev.name}</strong>`;
-                if(ev.person) details += `<br>👤 ${ev.person}`;
-                if(ev.address) details += `<br>📍 ${ev.address}`;
+                let details = `<div><strong>${ev.time || 'Ceo dan'} - ${ev.name}</strong></div>`;
+                if(ev.person) details += `<div>👤 ${ev.person}</div>`;
+                if(ev.address) details += `<div>📍 ${ev.address}</div>`;
                 
-                details += `<button class="delete-btn" onclick="deleteEvent('${dateString}', ${index})">Obriši</button>`;
+                // Generišemo link za Google Kalendar
+                const gCalLink = createGCalLink(ev, dateString);
+
+                // Dugmići su odvojeni u poseban div
+                const actionsHtml = `
+                    <div class="card-actions">
+                        <a href="${gCalLink}" target="_blank" class="cal-btn" onclick="event.stopPropagation()">📅 Dodaj u Kalendar</a>
+                        <button class="delete-btn" onclick="deleteEvent('${dateString}', ${index}, event)">🗑️</button>
+                    </div>
+                `;
                 
-                card.innerHTML = details;
+                card.innerHTML = details + actionsHtml;
                 list.appendChild(card);
             });
         }
@@ -209,11 +266,6 @@
         document.getElementById('eventTime').value = '';
         document.getElementById('eventPerson').value = '';
         document.getElementById('eventAddress').value = '';
-        
-        // Traženje dozvole za notifikacije pri kliku (zbog pravila pretraživača)
-        if ("Notification" in window && Notification.permission !== "granted") {
-            Notification.requestPermission();
-        }
     }
 
     function closeModal() {
@@ -243,7 +295,8 @@
         closeModal();
     }
 
-    function deleteEvent(date, index) {
+    function deleteEvent(date, index, event) {
+        event.stopPropagation(); // Sprečava otvaranje modala pri brisanju
         if(confirm('Da li ste sigurni da želite da obrišete ovaj događaj?')) {
             events[date].splice(index, 1);
             if(events[date].length === 0) delete events[date];
@@ -252,7 +305,7 @@
         }
     }
 
-    // Unapređeni sistem notifikacija
+    // Ostaje notifikacija za PC
     function checkNotifications() {
         const now = new Date();
         const currentDateString = now.toISOString().split('T')[0];
@@ -265,27 +318,20 @@
             events[currentDateString].forEach(ev => {
                 if (ev.time === currentTimeString && !notifiedEvents[ev.id]) {
                     
-                    // 1. Zvučni alarm
                     try {
                         let audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
                         audio.play();
                     } catch(e) {}
 
-                    // 2. Sistemska notifikacija
                     if ("Notification" in window && Notification.permission === "granted") {
                         try {
                             new Notification("📅 Podsetnik: " + ev.name, {
                                 body: `Vreme: ${ev.time}\nOsoba: ${ev.person || '-'}\nAdresa: ${ev.address || '-'}`,
                                 icon: 'https://cdn-icons-png.flaticon.com/512/2361/2361561.png'
                             });
-                        } catch(e) {
-                            console.log("Sistemska notifikacija nije uspela.");
-                        }
+                        } catch(e) {}
                     }
 
-                    // 3. Sigurni Alert za telefone (radi 100% ako je aplikacija otvorena)
-                    alert(`🔔 PODSETNIK ZA DOGAĐAJ!\n\nNaziv: ${ev.name}\nVreme: ${ev.time}\nOsoba: ${ev.person || '-'}\nAdresa: ${ev.address || '-'}`);
-                    
                     notifiedEvents[ev.id] = true;
                     localStorage.setItem('notified_events', JSON.stringify(notifiedEvents));
                 }
