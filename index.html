@@ -1,445 +1,299 @@
 <!DOCTYPE html>
-<html lang="sr" class="light">
+<html lang="sr">
 <head>
     <meta charset="UTF-8">
-    <!-- Meta tag za mobilne telefone, sprečava zumiranje prilikom unosa -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Nedeljni Planer</title>
-    
-    <!-- Tailwind CSS za stilizaciju -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: '#6366f1',
-                    }
-                }
-            }
-        }
-    </script>
     <style>
-        /* Sakrivanje scrollbar-a za čistiji izgled */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        :root {
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --card-bg: #fff;
+            --border-color: #ddd;
+            --header-bg: #2c3e50;
+            --header-text: #fff;
+            --btn-bg: #3498db;
+            --btn-hover: #2980b9;
+        }
+        [data-theme="dark"] {
+            --bg-color: #1a1a2e;
+            --text-color: #e6e6e6;
+            --card-bg: #16213e;
+            --border-color: #0f3460;
+            --header-bg: #0f3460;
+            --header-text: #fff;
+            --btn-bg: #e94560;
+            --btn-hover: #d13b52;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; height: 100dvh; overflow: hidden; transition: 0.3s; }
         
-        /* input[type="color"] custom stil */
-        input[type="color"] {
-            -webkit-appearance: none;
-            border: none;
-            width: 100%;
-            height: 40px;
-            border-radius: 0.5rem;
-            cursor: pointer;
-        }
-        input[type="color"]::-webkit-color-swatch-wrapper {
-            padding: 0;
-        }
-        input[type="color"]::-webkit-color-swatch {
-            border: none;
-            border-radius: 0.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
+        /* Header */
+        header { background-color: var(--header-bg); color: var(--header-text); padding: 15px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .date-time { font-weight: bold; font-size: 1.1em; }
+        .theme-toggle { background: var(--btn-bg); color: #fff; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 0.9em; }
+        
+        /* Main Content - Horizontal Layout for Mobile */
+        .week-container { display: flex; flex-direction: column; flex-grow: 1; overflow-y: auto; padding: 10px; gap: 10px; }
+        .day-column { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; cursor: pointer; transition: 0.2s; min-height: 100px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .day-column:hover { border-color: var(--btn-bg); }
+        .day-title { text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 1.2em; border-bottom: 2px solid var(--border-color); padding-bottom: 5px; }
+        .events-list { display: flex; flex-direction: column; gap: 8px; }
+        .event-card { padding: 10px; border-radius: 6px; font-size: 0.9em; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        
+        /* Footer navigation */
+        footer { background-color: var(--header-bg); padding: 10px; display: flex; justify-content: space-between; flex-shrink: 0; }
+        .nav-btn { background-color: var(--btn-bg); color: #fff; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 1em; }
+        
+        /* Modal for adding events */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 1000; padding: 15px; }
+        .modal-content { background-color: var(--card-bg); padding: 20px; border-radius: 8px; width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 12px; }
+        .modal-content h3 { text-align: center; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; background: var(--bg-color); color: var(--text-color); }
+        .modal-actions { display: flex; justify-content: space-between; margin-top: 10px; }
+        .save-btn { background-color: #2ecc71; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 48%; }
+        .cancel-btn { background-color: #e74c3c; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 48%; }
+        .delete-btn { background-color: #c0392b; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-top: 5px; width: 100%; font-size: 0.8em; }
     </style>
 </head>
-<body class="flex flex-col h-[100dvh] w-full overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 transition-colors duration-300 font-sans">
+<body>
 
-    <!-- Header: Prekidač za temu i Sat/Datum -->
-    <header class="flex justify-between items-center p-4 bg-white dark:bg-slate-800 shadow-sm shrink-0 z-10 transition-colors">
-        <button id="theme-toggle" class="p-2 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand">
-            <!-- Ikona za Sunce / Mesec (menja se kroz JS) -->
-            <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-            </svg>
-        </button>
-
-        <div class="text-right">
-            <div id="clock" class="text-xl md:text-2xl font-bold text-brand dark:text-indigo-400">00:00:00</div>
-            <div id="date-display" class="text-xs md:text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wide font-semibold">Datum</div>
-        </div>
+    <header>
+        <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">Mod</button>
+        <div class="date-time" id="clock">Datum i Vreme</div>
     </header>
 
-    <!-- Main: Lista dana -->
-    <main class="flex-1 overflow-y-auto p-3 space-y-4 pb-6" id="week-container">
-        <!-- JS će ovde generisati dane u nedelji -->
-    </main>
+    <div class="week-container" id="weekContainer">
+        <!-- Dani se generišu preko JS -->
+    </div>
 
-    <!-- Footer: Navigacija između nedelja -->
-    <footer class="flex justify-between items-center p-3 md:p-4 bg-white dark:bg-slate-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] shrink-0 z-10 transition-colors">
-        <button onclick="changeWeek(-1)" class="flex items-center gap-1 md:gap-2 px-3 py-2 md:px-4 md:py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl text-sm md:text-base font-semibold transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-            </svg>
-            Prethodna
-        </button>
-        
-        <div id="current-week-label" class="text-xs md:text-sm font-bold text-slate-500 dark:text-slate-400 text-center px-2 hidden md:block">
-            <!-- Labela nedelje -->
-        </div>
-
-        <button onclick="changeWeek(1)" class="flex items-center gap-1 md:gap-2 px-3 py-2 md:px-4 md:py-2.5 bg-brand hover:bg-indigo-600 text-white rounded-xl text-sm md:text-base font-semibold shadow-md shadow-brand/30 transition-all active:scale-95">
-            Sledeća
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-            </svg>
-        </button>
+    <footer>
+        <button class="nav-btn" onclick="changeWeek(-1)">◀ Prethodna</button>
+        <button class="nav-btn" onclick="changeWeek(1)">Sledeća ▶</button>
     </footer>
 
-    <!-- Modal (Iskočni prozor za unos) -->
-    <div id="event-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex-col items-center justify-end md:justify-center transition-opacity opacity-0">
-        <div class="bg-white dark:bg-slate-800 w-full md:w-[450px] rounded-t-2xl md:rounded-2xl shadow-2xl p-5 md:p-6 transform transition-transform translate-y-full md:translate-y-0 duration-300">
-            <div class="flex justify-between items-center mb-5">
-                <h3 class="text-xl font-bold" id="modal-title">Dodaj Plan</h3>
-                <button onclick="closeModal()" class="p-2 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-300">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                    </svg>
-                </button>
+    <!-- Modal za unos događaja -->
+    <div class="modal" id="eventModal">
+        <div class="modal-content">
+            <h3 id="modalTitle">Novi događaj</h3>
+            <input type="hidden" id="eventDate">
+            <input type="text" id="eventName" placeholder="Naziv događaja (Obavezno)">
+            <input type="time" id="eventTime">
+            <input type="text" id="eventPerson" placeholder="Ime i kontakt osobe">
+            <input type="text" id="eventAddress" placeholder="Adresa">
+            <select id="eventColor">
+                <option value="#3498db">Plava (Standardno)</option>
+                <option value="#e74c3c">Crvena (Visok prioritet)</option>
+                <option value="#f1c40f">Žuta (Srednji prioritet)</option>
+                <option value="#2ecc71">Zelena (Nizak prioritet)</option>
+                <option value="#9b59b6">Ljubičasta (Lično)</option>
+                <option value="#e67e22">Narandžasta (Posao)</option>
+                <option value="#34495e">Siva (Ostalo)</option>
+            </select>
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeModal()">Odustani</button>
+                <button class="save-btn" onclick="saveEvent()">Sačuvaj</button>
             </div>
-
-            <form id="event-form" class="space-y-4">
-                <input type="hidden" id="event-date">
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Naziv događaja</label>
-                    <input type="text" id="event-title" required class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all dark:text-white" placeholder="Npr. Poslovni sastanak">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Vreme</label>
-                    <input type="time" id="event-time" required class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all dark:text-white appearance-none">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Ime i kontakt osobe (Opciono)</label>
-                    <input type="text" id="event-contact" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all dark:text-white" placeholder="Npr. Marko Marković 060123456">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Adresa (Opciono)</label>
-                    <input type="text" id="event-address" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all dark:text-white" placeholder="Npr. Knez Mihailova 1">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Boja (Prioritet)</label>
-                    <div class="flex gap-3">
-                        <input type="color" id="event-color" value="#6366f1">
-                        <!-- Brze opcije boja -->
-                        <div class="flex gap-2 items-center">
-                            <button type="button" onclick="document.getElementById('event-color').value='#ef4444'" class="w-8 h-8 rounded-full bg-red-500 ring-2 ring-transparent focus:ring-slate-400"></button>
-                            <button type="button" onclick="document.getElementById('event-color').value='#f59e0b'" class="w-8 h-8 rounded-full bg-amber-500 ring-2 ring-transparent focus:ring-slate-400"></button>
-                            <button type="button" onclick="document.getElementById('event-color').value='#10b981'" class="w-8 h-8 rounded-full bg-emerald-500 ring-2 ring-transparent focus:ring-slate-400"></button>
-                            <button type="button" onclick="document.getElementById('event-color').value='#6366f1'" class="w-8 h-8 rounded-full bg-indigo-500 ring-2 ring-transparent focus:ring-slate-400"></button>
-                        </div>
-                    </div>
-                </div>
-
-                <button type="submit" class="w-full py-3 mt-2 bg-brand hover:bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-brand/30 transition-transform active:scale-95">
-                    Sačuvaj
-                </button>
-            </form>
         </div>
     </div>
 
-    <script>
-        // --- Podaci i Inicijalizacija ---
-        const DANI = ['Nedelja', 'Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota'];
-        const MESECI = ['Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun', 'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'];
+<script>
+    let currentDate = new Date();
+    let events = JSON.parse(localStorage.getItem('planer_events')) || {};
+    let notifiedEvents = JSON.parse(localStorage.getItem('notified_events')) || {};
 
-        let events = JSON.parse(localStorage.getItem('planerEvents')) || [];
-        let currentWeekStart = getMonday(new Date());
+    const daysInWeek = ['Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja'];
 
-        // --- Pomoćne funkcije za datume ---
-        function getMonday(d) {
-            d = new Date(d);
-            let day = d.getDay(), diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            return new Date(d.setDate(diff));
+    // Inicijalizacija
+    function init() {
+        if(localStorage.getItem('theme') === 'dark') {
+            document.body.setAttribute('data-theme', 'dark');
         }
-
-        function toLocalISODate(date) {
-            const tzoffset = (new Date()).getTimezoneOffset() * 60000; 
-            return (new Date(date - tzoffset)).toISOString().split('T')[0];
-        }
-
-        // --- Dark/Light Mode Logika ---
-        const themeToggleBtn = document.getElementById('theme-toggle');
-        const htmlElement = document.documentElement;
-        
-        function updateThemeIcon() {
-            if (htmlElement.classList.contains('dark')) {
-                themeToggleBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg>`;
-            } else {
-                themeToggleBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>`;
-            }
-        }
-
-        function toggleTheme() {
-            htmlElement.classList.toggle('dark');
-            const isDark = htmlElement.classList.contains('dark');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            updateThemeIcon();
-        }
-
-        // Inicijalna provera teme
-        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            htmlElement.classList.add('dark');
-        } else {
-            htmlElement.classList.remove('dark');
-        }
-        updateThemeIcon();
-        themeToggleBtn.addEventListener('click', toggleTheme);
-
-        // --- Sat i Datum ---
-        function updateClock() {
-            const now = new Date();
-            const h = String(now.getHours()).padStart(2, '0');
-            const m = String(now.getMinutes()).padStart(2, '0');
-            const s = String(now.getSeconds()).padStart(2, '0');
-            document.getElementById('clock').innerText = `${h}:${m}:${s}`;
-            
-            const dayName = DANI[now.getDay()];
-            const dateNum = now.getDate();
-            const monthName = MESECI[now.getMonth()];
-            document.getElementById('date-display').innerText = `${dayName}, ${dateNum}. ${monthName}`;
-        }
-        setInterval(updateClock, 1000);
         updateClock();
+        setInterval(updateClock, 1000);
+        setInterval(checkNotifications, 30000); // Provera svake 30 sekundi
+        renderWeek();
+    }
 
-        // --- Renderovanje Nedelje ---
-        function renderWeek() {
-            const container = document.getElementById('week-container');
-            container.innerHTML = '';
+    function toggleTheme() {
+        const isDark = document.body.getAttribute('data-theme') === 'dark';
+        if(isDark) {
+            document.body.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'light');
+        } else {
+            document.body.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+        }
+    }
 
-            const endOfWeek = new Date(currentWeekStart);
-            endOfWeek.setDate(currentWeekStart.getDate() + 6);
-            document.getElementById('current-week-label').innerText = 
-                `${currentWeekStart.getDate()}. ${MESECI[currentWeekStart.getMonth()].substring(0,3)} - ${endOfWeek.getDate()}. ${MESECI[endOfWeek.getMonth()].substring(0,3)} ${endOfWeek.getFullYear()}.`;
+    function updateClock() {
+        const now = new Date();
+        const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+        document.getElementById('clock').innerText = now.toLocaleDateString('sr-RS', options);
+    }
 
-            const todayStr = toLocalISODate(new Date());
+    // Pronalazi ponedeljak za trenutno izabranu nedelju
+    function getStartOfWeek(date) {
+        const d = new Date(date);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
+        return new Date(d.setDate(diff));
+    }
 
-            // 7 dana = 7 redova
-            for (let i = 0; i < 7; i++) {
-                const dayDate = new Date(currentWeekStart);
-                dayDate.setDate(currentWeekStart.getDate() + i);
-                
-                const dateStr = toLocalISODate(dayDate);
-                const isToday = dateStr === todayStr;
+    function changeWeek(offset) {
+        currentDate.setDate(currentDate.getDate() + (offset * 7));
+        renderWeek();
+    }
 
-                const row = document.createElement('div');
-                row.className = `flex flex-col bg-white dark:bg-slate-800 rounded-2xl shadow-sm border flex-shrink-0 ${
-                    isToday 
-                        ? 'border-brand ring-2 ring-brand/20 dark:ring-indigo-400/30' 
-                        : 'border-slate-200 dark:border-slate-700/70'
-                } overflow-hidden transition-colors`;
+    function renderWeek() {
+        const container = document.getElementById('weekContainer');
+        container.innerHTML = '';
+        
+        const startOfWeek = getStartOfWeek(currentDate);
 
-                // Zaglavlje reda (Dan)
-                const header = document.createElement('div');
-                header.className = `p-3 md:p-4 flex items-center justify-between cursor-pointer transition-colors ${
-                    isToday 
-                        ? 'bg-indigo-50/80 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' 
-                        : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 active:bg-slate-100 dark:active:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700/50'
-                } border-b border-slate-100 dark:border-slate-700/60`;
-                header.onclick = () => openModal(dateStr, dayDate);
-                
-                const dayNameIndex = dayDate.getDay();
-                
-                header.innerHTML = `
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-xl md:text-2xl font-bold leading-tight">${dayDate.getDate()}.</span>
-                        <span class="text-sm md:text-base font-semibold uppercase tracking-wider ${isToday ? 'text-brand dark:text-indigo-400' : 'text-slate-500 dark:text-slate-400'}">${DANI[dayNameIndex]}</span>
-                    </div>
-                    <button class="w-8 h-8 rounded-full flex items-center justify-center ${
-                        isToday ? 'bg-indigo-200 dark:bg-indigo-800/50 text-indigo-800 dark:text-indigo-200' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                    } transition-colors shadow-sm pointer-events-none" title="Dodaj">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                    </button>
-                `;
+        for (let i = 0; i < 7; i++) {
+            const currentDay = new Date(startOfWeek);
+            currentDay.setDate(startOfWeek.getDate() + i);
+            const dateString = currentDay.toISOString().split('T')[0];
 
-                // Telo reda (Događaji)
-                const eventsContainer = document.createElement('div');
-                eventsContainer.className = 'p-2 md:p-3 space-y-2';
-
-                // Filtriranje i sortiranje po vremenu
-                const dayEvents = events.filter(e => e.date === dateStr).sort((a, b) => a.time.localeCompare(b.time));
-
-                if (dayEvents.length === 0) {
-                    eventsContainer.innerHTML = `<div class="text-center text-sm text-slate-400 dark:text-slate-500 my-2 italic">Slobodan dan</div>`;
-                } else {
-                    dayEvents.forEach(event => {
-                        eventsContainer.appendChild(createEventCard(event));
-                    });
+            const col = document.createElement('div');
+            col.className = 'day-column';
+            col.onclick = (e) => {
+                if(!e.target.classList.contains('delete-btn')) {
+                    openModal(dateString);
                 }
-
-                row.appendChild(header);
-                row.appendChild(eventsContainer);
-                container.appendChild(row);
-            }
-        }
-
-        // --- Kreiranje kartice događaja ---
-        function createEventCard(event) {
-            const card = document.createElement('div');
-            card.className = 'bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200/80 dark:border-slate-600/50 p-3 relative flex flex-col gap-1 shadow-sm';
-            // Leva linija u boji prioriteta
-            card.style.borderLeftWidth = '6px';
-            card.style.borderLeftColor = event.color || '#6366f1';
-
-            card.innerHTML = `
-                <div class="flex justify-between items-start gap-2">
-                    <div class="flex items-center gap-2 flex-1">
-                        <span class="text-xs md:text-sm font-bold px-2 py-1 rounded bg-white dark:bg-slate-800 shadow-sm" style="color: ${event.color || '#6366f1'}">
-                            ${event.time}
-                        </span>
-                        <h4 class="font-bold text-slate-800 dark:text-slate-100 text-sm md:text-base leading-tight break-words">${event.title}</h4>
-                    </div>
-                    <button onclick="deleteEvent('${event.id}', event)" class="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors p-1 rounded-md active:bg-slate-200 dark:active:bg-slate-600" title="Obriši">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                        </svg>
-                    </button>
-                </div>
-                ${event.contact ? `
-                <div class="text-xs md:text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-1.5 truncate">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 flex-shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
-                    <span class="truncate">${event.contact}</span>
-                </div>` : ''}
-                ${event.address ? `
-                <div class="text-xs md:text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate mt-0.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 flex-shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" /></svg>
-                    <span class="truncate">${event.address}</span>
-                </div>` : ''}
-            `;
-            
-            return card;
-        }
-
-        // --- Navigacija kroz nedelje ---
-        function changeWeek(offset) {
-            currentWeekStart.setDate(currentWeekStart.getDate() + (offset * 7));
-            renderWeek();
-        }
-
-        // --- Modal Logika ---
-        const modal = document.getElementById('event-modal');
-        const modalContent = modal.querySelector('div');
-
-        function openModal(dateStr, dateObj) {
-            document.getElementById('event-date').value = dateStr;
-            const dayNameIndex = dateObj.getDay();
-            document.getElementById('modal-title').innerText = `Plan za ${DANI[dayNameIndex]}`;
-            
-            // Očisti formu
-            document.getElementById('event-title').value = '';
-            document.getElementById('event-time').value = '12:00';
-            document.getElementById('event-contact').value = '';
-            document.getElementById('event-address').value = '';
-            
-            // Prikaz modala sa animacijom
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            // Malo odlaganje za CSS tranziciju
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modalContent.classList.remove('translate-y-full');
-            }, 10);
-        }
-
-        function closeModal() {
-            modal.classList.add('opacity-0');
-            modalContent.classList.add('translate-y-full');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-            }, 300); // vreme trajanja css tranzicije
-        }
-
-        // Zatvaranje na klik izvan modala
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeModal();
-        });
-
-        // --- Dodavanje i Brisanje Događaja ---
-        document.getElementById('event-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const newEvent = {
-                id: Date.now().toString(),
-                date: document.getElementById('event-date').value,
-                title: document.getElementById('event-title').value,
-                time: document.getElementById('event-time').value,
-                contact: document.getElementById('event-contact').value,
-                address: document.getElementById('event-address').value,
-                color: document.getElementById('event-color').value,
-                notified: false // za notifikacije
             };
 
-            events.push(newEvent);
-            saveEventsToStorage();
-            renderWeek();
-            closeModal();
-            requestNotificationPermission(); // Tražimo dozvolu kad korisnik sačuva prvi plan
-        });
+            const displayDate = currentDay.toLocaleDateString('sr-RS', {day: 'numeric', month: 'numeric'});
+            
+            col.innerHTML = `
+                <div class="day-title">${daysInWeek[i]}<br><small>${displayDate}</small></div>
+                <div class="events-list" id="events-${dateString}"></div>
+            `;
+            container.appendChild(col);
 
-        function deleteEvent(id, e) {
-            e.stopPropagation(); // Sprečava klik na ceo red
-            if (confirm('Da li ste sigurni da želite da obrišete ovaj plan?')) {
-                events = events.filter(event => event.id !== id);
-                saveEventsToStorage();
-                renderWeek();
-            }
+            renderEventsForDay(dateString);
+        }
+    }
+
+    function renderEventsForDay(dateString) {
+        const list = document.getElementById(`events-${dateString}`);
+        if (!list) return;
+        list.innerHTML = '';
+
+        if (events[dateString]) {
+            // Sortiranje po vremenu
+            events[dateString].sort((a, b) => a.time.localeCompare(b.time));
+
+            events[dateString].forEach((ev, index) => {
+                const card = document.createElement('div');
+                card.className = 'event-card';
+                card.style.backgroundColor = ev.color;
+                
+                let details = `<strong>${ev.time} - ${ev.name}</strong>`;
+                if(ev.person) details += `<br>👤 ${ev.person}`;
+                if(ev.address) details += `<br>📍 ${ev.address}`;
+                
+                details += `<button class="delete-btn" onclick="deleteEvent('${dateString}', ${index})">Obriši</button>`;
+                
+                card.innerHTML = details;
+                list.appendChild(card);
+            });
+        }
+    }
+
+    function openModal(date) {
+        document.getElementById('eventModal').style.display = 'flex';
+        document.getElementById('eventDate').value = date;
+        document.getElementById('eventName').value = '';
+        document.getElementById('eventTime').value = '';
+        document.getElementById('eventPerson').value = '';
+        document.getElementById('eventAddress').value = '';
+        
+        // Traženje dozvole za notifikacije pri kliku (zbog pravila pretraživača)
+        if ("Notification" in window && Notification.permission !== "granted") {
+            Notification.requestPermission();
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('eventModal').style.display = 'none';
+    }
+
+    function saveEvent() {
+        const date = document.getElementById('eventDate').value;
+        const name = document.getElementById('eventName').value;
+        const time = document.getElementById('eventTime').value;
+        const person = document.getElementById('eventPerson').value;
+        const address = document.getElementById('eventAddress').value;
+        const color = document.getElementById('eventColor').value;
+
+        if (!name) {
+            alert('Naziv događaja je obavezan!');
+            return;
         }
 
-        function saveEventsToStorage() {
-            localStorage.setItem('planerEvents', JSON.stringify(events));
+        if (!events[date]) events[date] = [];
+        
+        const newEvent = { id: Date.now().toString(), name, time, person, address, color };
+        events[date].push(newEvent);
+        
+        localStorage.setItem('planer_events', JSON.stringify(events));
+        renderEventsForDay(date);
+        closeModal();
+    }
+
+    function deleteEvent(date, index) {
+        if(confirm('Da li ste sigurni da želite da obrišete ovaj događaj?')) {
+            events[date].splice(index, 1);
+            if(events[date].length === 0) delete events[date];
+            localStorage.setItem('planer_events', JSON.stringify(events));
+            renderEventsForDay(date);
         }
+    }
 
-        // --- Podsetnici (Push Notifikacije) ---
-        function requestNotificationPermission() {
-            if ("Notification" in window) {
-                if (Notification.permission !== "granted" && Notification.permission !== "denied") {
-                    Notification.requestPermission();
-                }
-            }
-        }
+    // Unapređeni sistem notifikacija
+    function checkNotifications() {
+        const now = new Date();
+        const currentDateString = now.toISOString().split('T')[0];
+        
+        const currentHour = now.getHours().toString().padStart(2, '0');
+        const currentMinute = now.getMinutes().toString().padStart(2, '0');
+        const currentTimeString = `${currentHour}:${currentMinute}`;
 
-        function checkNotifications() {
-            if (!("Notification" in window) || Notification.permission !== "granted") return;
+        if (events[currentDateString]) {
+            events[currentDateString].forEach(ev => {
+                if (ev.time === currentTimeString && !notifiedEvents[ev.id]) {
+                    
+                    // 1. Zvučni alarm
+                    try {
+                        let audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+                        audio.play();
+                    } catch(e) {}
 
-            const now = new Date();
-            const todayStr = toLocalISODate(now);
-            const currentTimeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+                    // 2. Sistemska notifikacija
+                    if ("Notification" in window && Notification.permission === "granted") {
+                        try {
+                            new Notification("📅 Podsetnik: " + ev.name, {
+                                body: `Vreme: ${ev.time}\nOsoba: ${ev.person || '-'}\nAdresa: ${ev.address || '-'}`,
+                                icon: 'https://cdn-icons-png.flaticon.com/512/2361/2361561.png'
+                            });
+                        } catch(e) {
+                            console.log("Sistemska notifikacija nije uspela.");
+                        }
+                    }
 
-            let needsSave = false;
-
-            events.forEach(event => {
-                if (event.date === todayStr && event.time === currentTimeStr && !event.notified) {
-                    // Pusti notifikaciju
-                    new Notification("Podsetnik: " + event.title, {
-                        body: `Vreme je za događaj u ${event.time}.\n${event.contact ? 'Kontakt: ' + event.contact : ''}`,
-                        icon: "https://cdn-icons-png.flaticon.com/512/825/825590.png"
-                    });
-                    event.notified = true;
-                    needsSave = true;
+                    // 3. Sigurni Alert za telefone (radi 100% ako je aplikacija otvorena)
+                    alert(`🔔 PODSETNIK ZA DOGAĐAJ!\n\nNaziv: ${ev.name}\nVreme: ${ev.time}\nOsoba: ${ev.person || '-'}\nAdresa: ${ev.address || '-'}`);
+                    
+                    notifiedEvents[ev.id] = true;
+                    localStorage.setItem('notified_events', JSON.stringify(notifiedEvents));
                 }
             });
-
-            if (needsSave) {
-                saveEventsToStorage();
-            }
         }
+    }
 
-        // Proveravaj svake sekunde (da ne bismo propustili minut)
-        setInterval(checkNotifications, 1000);
-
-        // --- Inicijalno iscrtavanje ---
-        renderWeek();
-
-    </script>
+    window.onload = init;
+</script>
 </body>
 </html>
