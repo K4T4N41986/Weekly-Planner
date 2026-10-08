@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Poslovni Planer - Terenske Ekipe</title>
     
-    <!-- Firebase SDK (Compat verzija za direktan rad u pretraživaču) -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
     <style>
         :root {
@@ -33,101 +34,60 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; height: 100dvh; overflow: hidden; transition: 0.3s; }
         
+        /* Login Overlay */
+        #loginScreen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color); z-index: 2000;
+            display: flex; justify-content: center; align-items: center; padding: 20px;
+        }
+        .login-card {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            padding: 30px; border-radius: 12px; width: 100%; max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 15px;
+        }
+
         /* Header */
         header { background-color: var(--header-bg); color: var(--header-text); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px; }
-        .date-time { font-weight: bold; font-size: 1em; }
+        .date-time { font-weight: bold; font-size: 0.95em; }
         .nav-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
         .tab-btn { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 600; transition: 0.2s; }
         .tab-btn:hover, .tab-btn.active { background: var(--btn-bg); border-color: var(--btn-bg); }
         
         .header-actions { display: flex; gap: 10px; align-items: center; }
-        .theme-toggle { background: var(--btn-bg); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 600; }
-        
-        /* Main Container - Views */
+        .theme-toggle, .logout-btn { background: var(--btn-bg); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 600; }
+        .logout-btn { background-color: #ef4444; }
+
+        /* App Container */
+        #appContainer { display: none; flex-direction: column; height: 100dvh; overflow: hidden; }
+
+        /* Views */
         .main-view { display: none; flex-grow: 1; overflow: auto; padding: 15px; }
         .main-view.active-view { display: flex; flex-direction: column; }
 
-        /* Raspored Nedelje Grid */
-        .week-container { 
-            display: grid; 
-            grid-template-columns: repeat(7, 1fr); 
-            flex-grow: 1; 
-            overflow: auto; 
-            gap: 12px; 
-        }
-        @media (max-width: 1024px) {
-            .week-container { grid-template-columns: 1fr; }
-        }
+        .week-container { display: grid; grid-template-columns: repeat(7, 1fr); flex-grow: 1; overflow: auto; gap: 12px; }
+        @media (max-width: 1024px) { .week-container { grid-template-columns: 1fr; } }
 
-        .day-column { 
-            background-color: var(--card-bg); 
-            border: 1px solid var(--border-color); 
-            border-radius: 10px; 
-            padding: 12px; 
-            display: flex; 
-            flex-direction: column; 
-            min-height: 250px; 
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            position: relative;
-        }
-        
-        .day-header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border-bottom: 2px solid var(--border-color); 
-            padding-bottom: 8px; 
-            margin-bottom: 10px; 
-        }
+        .day-column { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; min-height: 250px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
+        .day-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-bottom: 10px; }
         .day-title-info { cursor: pointer; flex-grow: 1; }
         .day-title-info:hover { opacity: 0.8; }
         .day-name { font-weight: bold; font-size: 1.05em; }
         .day-date { font-size: 0.85em; opacity: 0.8; }
         
-        .add-task-btn { 
-            background-color: var(--btn-bg); 
-            color: white; 
-            border: none; 
-            width: 30px; 
-            height: 30px; 
-            border-radius: 50%; 
-            font-size: 1.2em; 
-            cursor: pointer; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-weight: bold;
-            transition: 0.2s;
-            flex-shrink: 0;
-        }
+        .add-task-btn { background-color: var(--btn-bg); color: white; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 1.2em; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; transition: 0.2s; flex-shrink: 0; }
         .add-task-btn:hover { transform: scale(1.1); background-color: var(--btn-hover); }
 
         .events-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: calc(100vh - 220px); }
-        
-        .event-card { 
-            padding: 10px; 
-            border-radius: 6px; 
-            font-size: 0.85em; 
-            color: #fff; 
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.4); 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
+        .event-card { padding: 10px; border-radius: 6px; font-size: 0.85em; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.4); box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: pointer; transition: transform 0.1s; }
         .event-card:hover { transform: translateY(-2px); }
 
-        /* Footer navigation */
         footer { background-color: var(--header-bg); padding: 10px 20px; display: flex; justify-content: space-between; flex-shrink: 0; }
         .nav-btn { background-color: var(--btn-bg); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9em; }
-        .nav-btn:hover { background-color: var(--btn-hover); }
 
-        /* Modal / Form Styling */
+        /* Modals */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 1000; padding: 15px; }
         .modal-content { background-color: var(--card-bg); padding: 20px; border-radius: 10px; width: 100%; max-width: 550px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        .modal-content h3 { text-align: center; margin-bottom: 5px; }
-        
         input, select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); color: var(--text-color); font-size: 0.95em; }
-        
         .locations-container { display: flex; flex-direction: column; gap: 8px; border: 1px dashed var(--border-color); padding: 10px; border-radius: 6px; }
         
         .modal-actions { display: flex; justify-content: space-between; margin-top: 10px; gap: 10px; }
@@ -135,125 +95,148 @@
         .cancel-btn { background-color: #ef4444; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; }
         .secondary-btn { background-color: var(--btn-bg); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: bold; }
 
-        /* Tabele */
         .admin-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
         .admin-table th, .admin-table td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; }
         .admin-table th { background-color: rgba(0,0,0,0.05); }
 
-        /* Pregled knjige */
         .book-modal-body { display: flex; flex-direction: column; gap: 15px; min-height: 250px; }
         .book-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
         .task-detail-card { background: var(--bg-color); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; }
         .qr-badge { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; }
         .qr-badge img { width: 70px; height: 70px; background: white; padding: 3px; border-radius: 4px; }
+
+        /* Sakrivanje opcija za obične radnike */
+        .admin-only { display: none !important; }
+        body.is-admin .admin-only { display: flex !important; }
+        body.is-admin table .admin-only { display: table-cell !important; }
+        body.is-admin button.admin-only { display: inline-block !important; }
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="date-time" id="clock">Datum i Vreme</div>
-        <div class="nav-tabs">
-            <button class="tab-btn active" onclick="switchView('planner')">RASPORED</button>
-            <button class="tab-btn" onclick="switchView('serviseri')">SERVISERI</button>
-            <button class="tab-btn" onclick="switchView('vozila')">VOZILA</button>
-            <button class="tab-btn" onclick="switchView('registracije')">REGISTRACIJE</button>
-        </div>
-        <div class="header-actions">
-            <button class="theme-toggle" onclick="toggleTheme()">Mod</button>
-        </div>
-    </header>
-
-    <!-- PLANER VIEW -->
-    <div id="view-planner" class="main-view active-view">
-        <div class="week-container" id="weekContainer"></div>
-        <footer style="margin: -15px; margin-top: 15px;">
-            <button class="nav-btn" onclick="changeWeek(-1)">◀ Prethodna nedelja</button>
-            <button class="nav-btn" onclick="changeWeek(1)">Sledeća nedelja ▶</button>
-        </footer>
-    </div>
-
-    <!-- SERVISERI VIEW -->
-    <div id="view-serviseri" class="main-view">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2>Upravljanje Serviserima</h2>
-            <button class="secondary-btn" onclick="openServiserModal()">+ Dodaj novog servisera</button>
-        </div>
-        <div style="overflow-x: auto;">
-            <table class="admin-table" id="serviseriTable">
-                <thead>
-                    <tr>
-                        <th>Ime i prezime</th>
-                        <th>Šestocifreni ID</th>
-                        <th>QR Kod</th>
-                        <th>Akcije</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+    <!-- EKRAN ZA PRIJAVU -->
+    <div id="loginScreen">
+        <div class="login-card">
+            <h2 style="text-align: center; color: var(--btn-bg);">Poslovni Planer</h2>
+            <p style="text-align: center; font-size: 0.85em; opacity: 0.8;">Unesite pristupne podatke za prijavu</p>
+            <div>
+                <label style="font-size: 0.8em; font-weight: bold;">Email adresa:</label>
+                <input type="email" id="loginEmail" placeholder="ime@firma.com">
+            </div>
+            <div>
+                <label style="font-size: 0.8em; font-weight: bold;">Lozinka:</label>
+                <input type="password" id="loginPassword" placeholder="******">
+            </div>
+            <button class="save-btn" onclick="handleLogin()" style="width: 100%; padding: 12px;">Prijavi se</button>
+            <div id="loginError" style="color: #ef4444; font-size: 0.8em; text-align: center; display: none;"></div>
         </div>
     </div>
 
-    <!-- VOZILA VIEW -->
-    <div id="view-vozila" class="main-view">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2>Spisak Vozila</h2>
-            <button class="secondary-btn" onclick="openVoziloModal()">+ Dodaj vozilo</button>
+    <!-- GLAVNI APARAT APLIKACIJE -->
+    <div id="appContainer">
+        <header>
+            <div class="date-time" id="clock">Datum i Vreme</div>
+            <div class="nav-tabs">
+                <button class="tab-btn active" onclick="switchView('planner')">Raspored</button>
+                <button class="tab-btn" onclick="switchView('serviseri')">SERVISERI</button>
+                <button class="tab-btn" onclick="switchView('vozila')">VOZILA</button>
+                <button class="tab-btn" onclick="switchView('registracije')">REGISTRACIJE</button>
+            </div>
+            <div class="header-actions">
+                <span id="userBadge" style="font-size: 0.8em; opacity: 0.9; font-weight: bold;"></span>
+                <button class="theme-toggle" onclick="toggleTheme()">Mod</button>
+                <button class="logout-btn" onclick="handleLogout()">Odjava</button>
+            </div>
+        </header>
+
+        <!-- PLANER VIEW -->
+        <div id="view-planner" class="main-view active-view">
+            <div class="week-container" id="weekContainer"></div>
+            <footer style="margin: -15px; margin-top: 15px;">
+                <button class="nav-btn" onclick="changeWeek(-1)">◀ Prethodna nedelja</button>
+                <button class="nav-btn" onclick="changeWeek(1)">Sledeća nedelja ▶</button>
+            </footer>
         </div>
-        <div style="overflow-x: auto;">
-            <table class="admin-table" id="vozilaTable">
-                <thead>
-                    <tr>
-                        <th>Marka i model</th>
-                        <th>Registraciona oznaka</th>
-                        <th>Akcije</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+
+        <!-- SERVISERI VIEW -->
+        <div id="view-serviseri" class="main-view">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Upravljanje Serviserima</h2>
+                <button class="secondary-btn admin-only" onclick="openServiserModal()">+ Dodaj novog servisera</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="admin-table" id="serviseriTable">
+                    <thead>
+                        <tr>
+                            <th>Ime i prezime</th>
+                            <th>Šestocifreni ID</th>
+                            <th>QR Kod</th>
+                            <th class="admin-only">Akcije</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VOZILA VIEW -->
+        <div id="view-vozila" class="main-view">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Spisak Vozila</h2>
+                <button class="secondary-btn admin-only" onclick="openVoziloModal()">+ Dodaj vozilo</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="admin-table" id="vozilaTable">
+                    <thead>
+                        <tr>
+                            <th>Marka i model</th>
+                            <th>Registraciona oznaka</th>
+                            <th class="admin-only">Akcije</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- REGISTRACIJE VIEW -->
+        <div id="view-registracije" class="main-view">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Datum Registracije Vozila</h2>
+                <button class="secondary-btn admin-only" onclick="openRegistracijaModal()">+ Unesi registraciju</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="admin-table" id="registracijeTable">
+                    <thead>
+                        <tr>
+                            <th>Vozilo (Marka i Model)</th>
+                            <th>Registracija</th>
+                            <th>Datum isteka</th>
+                            <th>Status</th>
+                            <th class="admin-only">Akcije</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <!-- REGISTRACIJE VIEW -->
-    <div id="view-registracije" class="main-view">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2>Datum Registracije Vozila</h2>
-            <button class="secondary-btn" onclick="openRegistracijaModal()">+ Unesi registraciju</button>
-        </div>
-        <div style="overflow-x: auto;">
-            <table class="admin-table" id="registracijeTable">
-                <thead>
-                    <tr>
-                        <th>Vozilo (Marka i Model)</th>
-                        <th>Registracija</th>
-                        <th>Datum isteka</th>
-                        <th>Status</th>
-                        <th>Akcije</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- MODAL ZA UNOS ZADATKA -->
+    <!-- MODALI ZA UNOS -->
     <div class="modal" id="eventModal">
         <div class="modal-content">
-            <h3 id="modalTitle">Unos zaduženja za dan</h3>
+            <h3>Unos zaduženja za dan</h3>
             <input type="hidden" id="eventDate">
-            
             <div>
-                <label style="font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 5px;">Izaberite članove tima (servisere):</label>
-                <div id="workersCheckboxContainer" style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 5px; background: var(--bg-color);">
-                </div>
+                <label style="font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 5px;">Izaberite članove tima:</label>
+                <div id="workersCheckboxContainer" style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 5px; background: var(--bg-color);"></div>
             </div>
-
             <div class="locations-container" id="locationsContainer">
                 <label style="font-size: 0.85em; font-weight: bold;">Lokacije, vreme i kontakt:</label>
             </div>
             <button type="button" class="secondary-btn" onclick="addLocationField()">+ Dodaj još jednu lokaciju</button>
-
             <div>
-                <label style="font-size: 0.85em; opacity: 0.8;">Prioritet / Boja kartice:</label>
+                <label style="font-size: 0.85em; opacity: 0.8;">Boja kartice:</label>
                 <select id="eventColor">
                     <option value="#3b82f6">Plava (Standardno)</option>
                     <option value="#ef4444">Crvena (Visok prioritet)</option>
@@ -263,7 +246,6 @@
                     <option value="#f97316">Narandžasta (Terenski rad)</option>
                 </select>
             </div>
-
             <div class="modal-actions">
                 <button class="cancel-btn" onclick="closeModal('eventModal')">Odustani</button>
                 <button class="save-btn" onclick="saveTask()">Sačuvaj zaduženje</button>
@@ -271,18 +253,11 @@
         </div>
     </div>
 
-    <!-- MODAL ZA SERVISERA -->
     <div class="modal" id="serviserModal">
         <div class="modal-content">
             <h3>Unos novog servisera</h3>
-            <div>
-                <label style="font-size: 0.85em; opacity: 0.8;">Ime i prezime:</label>
-                <input type="text" id="newServiserName" placeholder="npr. Petar Petrović">
-            </div>
-            <div>
-                <label style="font-size: 0.85em; opacity: 0.8;">Šestocifreni ID (ostavi prazno za automatsko):</label>
-                <input type="text" id="newServiserId" placeholder="npr. 123456" maxlength="6">
-            </div>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Ime i prezime:</label><input type="text" id="newServiserName" placeholder="npr. Petar Petrović"></div>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Šestocifreni ID:</label><input type="text" id="newServiserId" placeholder="npr. 123456" maxlength="6"></div>
             <div class="modal-actions">
                 <button class="cancel-btn" onclick="closeModal('serviserModal')">Odustani</button>
                 <button class="save-btn" onclick="saveServiser()">Sačuvaj servisera</button>
@@ -290,18 +265,11 @@
         </div>
     </div>
 
-    <!-- MODAL ZA VOZILO -->
     <div class="modal" id="voziloModal">
         <div class="modal-content">
             <h3>Unos novog vozila</h3>
-            <div>
-                <label style="font-size: 0.85em; opacity: 0.8;">Marka i model:</label>
-                <input type="text" id="newVoziloModel" placeholder="npr. Fiat Doblò">
-            </div>
-            <div>
-                <label style="font-size: 0.85em; opacity: 0.8;">Registraciona oznaka:</label>
-                <input type="text" id="newVoziloReg" placeholder="npr. BG1234AJ">
-            </div>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Marka i model:</label><input type="text" id="newVoziloModel" placeholder="npr. Fiat Doblò"></div>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Registraciona oznaka:</label><input type="text" id="newVoziloReg" placeholder="npr. BG1234AJ"></div>
             <div class="modal-actions">
                 <button class="cancel-btn" onclick="closeModal('voziloModal')">Odustani</button>
                 <button class="save-btn" onclick="saveVozilo()">Sačuvaj vozilo</button>
@@ -309,18 +277,11 @@
         </div>
     </div>
 
-    <!-- MODAL ZA REGISTRACIJU -->
     <div class="modal" id="registracijaModal">
         <div class="modal-content">
             <h3>Evidencija registracije vozila</h3>
-            <div>
-                <label style="font-size: 0.85em; opacity: 0.8;">Izaberi vozilo:</label>
-                <select id="regVoziloSelect"></select>
-            </div>
-            <div>
-                <label style="font-size: 0.85em; opacity: 0.8;">Datum isteka registracije:</label>
-                <input type="date" id="newRegDate">
-            </div>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Izaberi vozilo:</label><select id="regVoziloSelect"></select></div>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Datum isteka registracije:</label><input type="date" id="newRegDate"></div>
             <div class="modal-actions">
                 <button class="cancel-btn" onclick="closeModal('registracijaModal')">Odustani</button>
                 <button class="save-btn" onclick="saveRegistracija()">Sačuvaj registraciju</button>
@@ -328,7 +289,6 @@
         </div>
     </div>
 
-    <!-- MODAL ZA PREGLED KNJIGE -->
     <div class="modal" id="bookModal">
         <div class="modal-content">
             <h3 id="bookModalTitle">Pregled zaduženja za dan</h3>
@@ -345,7 +305,6 @@
     </div>
 
 <script>
-    // 1. Inicijalizacija Firebase-a
     const firebaseConfig = {
       apiKey: "AIzaSyC4LnY6l1cjzHrwxiYhQc-0LoVwhk7IjVM",
       authDomain: "planer-22ce9.firebaseapp.com",
@@ -358,60 +317,94 @@
     
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    const auth = firebase.auth();
 
-    // Globalne promenljive
+    let currentUser = null;
+    let userRole = 'serviser'; // podrazumevano
     let currentDate = new Date();
-    let tasks = {};
-    let serviseri = [];
-    let vozila = [];
-    let registracije = [];
-    
-    let currentBookDate = '';
-    let currentBookIndex = 0;
+    let tasks = {}, serviseri = [], vozila = [], registracije = [];
+    let currentBookDate = '', currentBookIndex = 0;
     const daysInWeek = ['Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja'];
 
-    function init() {
-        if(localStorage.getItem('theme') === 'dark') {
-            document.body.setAttribute('data-theme', 'dark');
+    // Provera statusa prijave
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = user;
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'flex';
+            
+            // Proveri ulogu u bazi
+            db.ref('users/' + user.uid).once('value').then(snapshot => {
+                const userData = snapshot.val();
+                if (userData && userData.role) {
+                    userRole = userData.role;
+                } else {
+                    // Ako je admin email, postavi ga automatski kao admin
+                    if (user.email.includes('admin')) {
+                        userRole = 'admin';
+                        db.ref('users/' + user.uid).set({ email: user.email, role: 'admin' });
+                    } else {
+                        userRole = 'serviser';
+                        db.ref('users/' + user.uid).set({ email: user.email, role: 'serviser' });
+                    }
+                }
+                applyRolePermissions();
+            });
+
+            initApp();
+        } else {
+            currentUser = null;
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('appContainer').style.display = 'none';
         }
+    });
+
+    function handleLogin() {
+        const email = document.getElementById('loginEmail').value.trim();
+        const pass = document.getElementById('loginPassword').value.trim();
+        const errDiv = document.getElementById('loginError');
+
+        if (!email || !pass) { errDiv.innerText = 'Unesite email i lozinku!'; errDiv.style.display = 'block'; return; }
+
+        auth.signInWithEmailAndPassword(email, pass).catch(err => {
+            errDiv.innerText = 'Greška pri prijavi: ' + err.message;
+            errDiv.style.display = 'block';
+        });
+    }
+
+    function handleLogout() {
+        auth.signOut();
+    }
+
+    function applyRolePermissions() {
+        if (userRole === 'admin') {
+            document.body.classList.add('is-admin');
+            document.getElementById('userBadge').innerText = '👑 ADMIN (' + currentUser.email + ')';
+        } else {
+            document.body.classList.remove('is-admin');
+            document.getElementById('userBadge').innerText = '👤 SERVISER (' + currentUser.email + ')';
+        }
+        renderWeek();
+        renderServiseriTable();
+        renderVozilaTable();
+        renderRegistracijeTable();
+    }
+
+    function initApp() {
+        if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
         updateClock();
         setInterval(updateClock, 1000);
 
-        // Povezivanje na Firebase Realtime Bazu (Uživo slušanje promena)
-        db.ref('tasks').on('value', snapshot => {
-            tasks = snapshot.val() || {};
-            renderWeek();
-            if (currentBookDate && document.getElementById('bookModal').style.display === 'flex') {
-                renderBookCard();
-            }
-        });
-
-        db.ref('serviseri').on('value', snapshot => {
-            serviseri = snapshot.val() || [];
-            renderServiseriTable();
-        });
-
-        db.ref('vozila').on('value', snapshot => {
-            vozila = snapshot.val() || [];
-            renderVozilaTable();
-        });
-
-        db.ref('registracije').on('value', snapshot => {
-            registracije = snapshot.val() || [];
-            renderRegistracijeTable();
-            proveriIstekeRegistracija();
-        });
+        db.ref('tasks').on('value', snapshot => { tasks = snapshot.val() || {}; renderWeek(); });
+        db.ref('serviseri').on('value', snapshot => { serviseri = snapshot.val() || []; renderServiseriTable(); });
+        db.ref('vozila').on('value', snapshot => { vozila = snapshot.val() || []; renderVozilaTable(); });
+        db.ref('registracije').on('value', snapshot => { registracije = snapshot.val() || []; renderRegistracijeTable(); });
     }
 
     function toggleTheme() {
         const isDark = document.body.getAttribute('data-theme') === 'dark';
-        if(isDark) {
-            document.body.removeAttribute('data-theme');
-            localStorage.setItem('theme', 'light');
-        } else {
-            document.body.setAttribute('data-theme', 'dark');
-            localStorage.setItem('theme', 'dark');
-        }
+        document.body.toggleAttribute('data-theme', !isDark);
+        localStorage.setItem('theme', isDark ? 'light' : 'dark');
     }
 
     function updateClock() {
@@ -423,24 +416,8 @@
     function switchView(viewName) {
         document.querySelectorAll('.main-view').forEach(v => v.classList.remove('active-view'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        
-        if (viewName === 'planner') {
-            document.getElementById('view-planner').classList.add('active-view');
-            event.target.classList.add('active');
-            renderWeek();
-        } else if (viewName === 'serviseri') {
-            document.getElementById('view-serviseri').classList.add('active-view');
-            event.target.classList.add('active');
-            renderServiseriTable();
-        } else if (viewName === 'vozila') {
-            document.getElementById('view-vozila').classList.add('active-view');
-            event.target.classList.add('active');
-            renderVozilaTable();
-        } else if (viewName === 'registracije') {
-            document.getElementById('view-registracije').classList.add('active-view');
-            event.target.classList.add('active');
-            renderRegistracijeTable();
-        }
+        document.getElementById('view-' + viewName).classList.add('active-view');
+        event.target.classList.add('active');
     }
 
     function getStartOfWeek(date) {
@@ -469,13 +446,15 @@
             col.className = 'day-column';
             const displayDate = currentDay.toLocaleDateString('sr-RS', {day: 'numeric', month: 'numeric'});
             
+            const addBtnHtml = userRole === 'admin' ? `<button class="add-task-btn" onclick="openAddModal('${dateString}')">+</button>` : '';
+
             col.innerHTML = `
                 <div class="day-header">
-                    <div class="day-title-info" onclick="openBookView('${dateString}')" title="Klikni za pregled knjige">
+                    <div class="day-title-info" onclick="openBookView('${dateString}')">
                         <div class="day-name">${daysInWeek[i]}</div>
                         <div class="day-date">${displayDate}</div>
                     </div>
-                    <button class="add-task-btn" onclick="openAddModal('${dateString}')" title="Dodaj zadatak">+</button>
+                    ${addBtnHtml}
                 </div>
                 <div class="events-list" id="tasks-${dateString}"></div>
             `;
@@ -509,123 +488,71 @@
     }
 
     function openAddModal(date) {
-        if (serviseri.length === 0) {
-            alert('Prvo unesite bar jednog servisera u tabu SERVISERI!');
-            switchView('serviseri');
-            return;
-        }
-
+        if (userRole !== 'admin') return;
         document.getElementById('eventModal').style.display = 'flex';
         document.getElementById('eventDate').value = date;
-        
         const container = document.getElementById('workersCheckboxContainer');
         container.innerHTML = '';
         serviseri.forEach(s => {
-            const label = document.createElement('label');
-            label.style.cssText = "display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9em;";
-            label.innerHTML = `<input type="checkbox" class="worker-checkbox" value="${s.id}" style="width: auto;"> <strong>${s.name}</strong> (ID: ${s.id})`;
-            container.appendChild(label);
+            container.innerHTML += `<label style="display:flex;align-items:center;gap:8px;font-size:0.9em;"><input type="checkbox" class="worker-checkbox" value="${s.id}"> <strong>${s.name}</strong> (ID: ${s.id})</label>`;
         });
-
-        document.getElementById('locationsContainer').innerHTML = `
-            <label style="font-size: 0.85em; font-weight: bold;">Lokacije, vreme i kontakt:</label>
-        `;
+        document.getElementById('locationsContainer').innerHTML = '<label style="font-size:0.85em;font-weight:bold;">Lokacije, vreme i kontakt:</label>';
         addLocationField();
     }
 
-    function addLocationField(address = '', time = '', contact = '') {
+    function addLocationField() {
         const container = document.getElementById('locationsContainer');
         const index = container.getElementsByClassName('location-row').length + 1;
-        
         const row = document.createElement('div');
         row.className = 'location-row';
         row.style.cssText = "display: flex; flex-direction: column; gap: 4px; background: rgba(0,0,0,0.03); padding: 8px; border-radius: 4px; margin-bottom: 5px;";
         row.innerHTML = `
             <div style="font-size: 0.8em; font-weight: bold; opacity: 0.8;">Lokacija #${index}</div>
-            <input type="text" class="loc-address" placeholder="Adresa lokacije" value="${address}">
+            <input type="text" class="loc-address" placeholder="Adresa lokacije">
             <div style="display: flex; gap: 5px;">
-                <input type="time" class="loc-time" style="width: 40%;" value="${time}">
-                <input type="text" class="loc-contact" style="width: 60%;" placeholder="Kontakt na lokaciji (ime/telefon)" value="${contact}">
+                <input type="time" class="loc-time" style="width: 40%;">
+                <input type="text" class="loc-contact" style="width: 60%;" placeholder="Kontakt na lokaciji">
             </div>
         `;
         container.appendChild(row);
-
-        const addressInput = row.getElementsByClassName('loc-address')[0];
-        setTimeout(() => addressInput.focus(), 100);
+        setTimeout(() => row.getElementsByClassName('loc-address')[0].focus(), 100);
     }
 
-    // Serviseri akcije
     function openServiserModal() {
         document.getElementById('serviserModal').style.display = 'flex';
-        document.getElementById('newServiserName').value = '';
-        document.getElementById('newServiserId').value = '';
         setTimeout(() => document.getElementById('newServiserName').focus(), 100);
     }
 
     function saveServiser() {
         const name = document.getElementById('newServiserName').value.trim();
-        let servId = document.getElementById('newServiserId').value.trim();
-
-        if (!name) { alert('Unesite ime i prezime!'); return; }
-        if (!servId) {
-            servId = Math.floor(100000 + Math.random() * 900000).toString();
-        } else if (servId.length !== 6 || isNaN(servId)) {
-            alert('ID mora imati tačno 6 cifara!');
-            return;
-        }
-
-        if (serviseri.some(s => s.id === servId)) {
-            alert('Ovaj ID već postoji!');
-            return;
-        }
-
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ID:${servId}-Name:${encodeURIComponent(name)}`;
-        serviseri.push({ name, id: servId, qr: qrCodeUrl });
-        
-        db.ref('serviseri').set(serviseri); // Čuvanje u Firebase
+        let servId = document.getElementById('newServiserId').value.trim() || Math.floor(100000 + Math.random() * 900000).toString();
+        if (!name) return alert('Unesite ime!');
+        const qr = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ID:${servId}-Name:${encodeURIComponent(name)}`;
+        serviseri.push({ name, id: servId, qr });
+        db.ref('serviseri').set(serviseri);
         closeModal('serviserModal');
     }
 
     function renderServiseriTable() {
         const tbody = document.querySelector('#serviseriTable tbody');
-        tbody.innerHTML = '';
-        if (serviseri.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nema unetih serviserâ.</td></tr>';
-            return;
-        }
+        tbody.innerHTML = serviseri.length === 0 ? '<tr><td colspan="4" style="text-align:center;">Nema unetih serviserâ.</td></tr>' : '';
         serviseri.forEach((s, index) => {
-            tbody.innerHTML += `
-                <tr>
-                    <td><strong>${s.name}</strong></td>
-                    <td>${s.id}</td>
-                    <td><img src="${s.qr}" style="width: 40px; height: 40px; vertical-align: middle;"></td>
-                    <td><button class="secondary-btn" style="background-color: #ef4444; padding: 4px 8px; font-size: 0.8em;" onclick="deleteServiser(${index})">Obriši</button></td>
-                </tr>`;
+            const deleteBtn = userRole === 'admin' ? `<td><button class="secondary-btn" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteServiser(${index})">Obriši</button></td>` : '';
+            tbody.innerHTML += `<tr><td><strong>${s.name}</strong></td><td>${s.id}</td><td><img src="${s.qr}" style="width:40px;height:40px;"></td>${deleteBtn}</tr>`;
         });
     }
 
     function deleteServiser(index) {
-        if (confirm('Obrisati ovog servisera?')) {
-            serviseri.splice(index, 1);
-            db.ref('serviseri').set(serviseri);
-        }
+        if (confirm('Obrisati servisera?')) { serviseri.splice(index, 1); db.ref('serviseri').set(serviseri); }
     }
 
-    // Vozila akcije
-    function openVoziloModal() {
-        document.getElementById('voziloModal').style.display = 'flex';
-        document.getElementById('newVoziloModel').value = '';
-        document.getElementById('newVoziloReg').value = '';
-        setTimeout(() => document.getElementById('newVoziloModel').focus(), 100);
-    }
-
+    function openVoziloModal() { document.getElementById('voziloModal').style.display = 'flex'; }
     function saveVozilo() {
         const model = document.getElementById('newVoziloModel').value.trim();
         const reg = document.getElementById('newVoziloReg').value.trim();
-        if (!model || !reg) { alert('Unesite marku/model i registraciju!'); return; }
-
+        if(!model || !reg) return;
         vozila.push({ model, reg });
-        db.ref('vozila').set(vozila); // Čuvanje u Firebase
+        db.ref('vozila').set(vozila);
         closeModal('voziloModal');
     }
 
@@ -633,105 +560,60 @@
         const tbody = document.querySelector('#vozilaTable tbody');
         tbody.innerHTML = vozila.length === 0 ? '<tr><td colspan="3" style="text-align:center;">Nema vozila.</td></tr>' : '';
         vozila.forEach((v, index) => {
-            tbody.innerHTML += `
-                <tr>
-                    <td><strong>${v.model}</strong></td>
-                    <td>${v.reg}</td>
-                    <td><button class="secondary-btn" style="background-color: #ef4444; padding: 4px 8px; font-size: 0.8em;" onclick="deleteVozilo(${index})">Obriši</button></td>
-                </tr>`;
+            const deleteBtn = userRole === 'admin' ? `<td><button class="secondary-btn" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteVozilo(${index})">Obriši</button></td>` : '';
+            tbody.innerHTML += `<tr><td><strong>${v.model}</strong></td><td>${v.reg}</td>${deleteBtn}</tr>`;
         });
     }
 
-    function deleteVozilo(index) {
-        if (confirm('Obrisati vozilo?')) {
-            vozila.splice(index, 1);
-            db.ref('vozila').set(vozila);
-        }
-    }
+    function deleteVozilo(index) { if (confirm('Obrisati vozilo?')) { vozila.splice(index, 1); db.ref('vozila').set(vozila); } }
 
-    // Registracije akcije
     function openRegistracijaModal() {
-        if (vozila.length === 0) { alert('Prvo unesite vozilo u tabu VOZILA!'); switchView('vozila'); return; }
         document.getElementById('registracijaModal').style.display = 'flex';
-        
         const select = document.getElementById('regVoziloSelect');
         select.innerHTML = '';
-        vozila.forEach((v, idx) => {
-            select.innerHTML += `<option value="${idx}">${v.model} (${v.reg})</option>`;
-        });
+        vozila.forEach((v, idx) => select.innerHTML += `<option value="${idx}">${v.model} (${v.reg})</option>`);
     }
 
     function saveRegistracija() {
-        const voziloIndex = document.getElementById('regVoziloSelect').value;
+        const idx = document.getElementById('regVoziloSelect').value;
         const expiryDate = document.getElementById('newRegDate').value;
-        if (!expiryDate) { alert('Izaberite datum isteka registracije!'); return; }
-
-        const v = vozila[voziloIndex];
-        registracije.push({ voziloModel: v.model, voziloReg: v.reg, expiryDate });
-        db.ref('registracije').set(registracije); // Čuvanje u Firebase
+        if(!expiryDate) return;
+        registracije.push({ voziloModel: vozila[idx].model, voziloReg: vozila[idx].reg, expiryDate });
+        db.ref('registracije').set(registracije);
         closeModal('registracijaModal');
     }
 
     function renderRegistracijeTable() {
         const tbody = document.querySelector('#registracijeTable tbody');
-        tbody.innerHTML = registracije.length === 0 ? '<tr><td colspan="5" style="text-align:center;">Nema unetih registracija.</td></tr>' : '';
-        
+        tbody.innerHTML = registracije.length === 0 ? '<tr><td colspan="5" style="text-align:center;">Nema registracija.</td></tr>' : '';
         const danas = new Date();
         registracije.forEach((r, index) => {
-            const datumIsteka = new Date(r.expiryDate);
-            const istekla = datumIsteka < danas;
-            const statusStyle = istekla ? 'color: #ef4444; font-weight: bold;' : 'color: #22c55e; font-weight: bold;';
-            const statusText = istekla ? 'ISTEKLO (Potrebno produženje)' : 'Aktivno';
-
-            tbody.innerHTML += `
-                <tr>
-                    <td><strong>${r.voziloModel}</strong></td>
-                    <td>${r.voziloReg}</td>
-                    <td>${r.expiryDate}</td>
-                    <td style="${statusStyle}">${statusText}</td>
-                    <td>
-                        <button class="secondary-btn" style="background-color: #2563eb; padding: 4px 8px; font-size: 0.8em;" onclick="produziRegistraciju(${index})">Produži 1 god</button>
-                        <button class="secondary-btn" style="background-color: #ef4444; padding: 4px 8px; font-size: 0.8em;" onclick="deleteRegistracija(${index})">Obriši</button>
-                    </td>
-                </tr>`;
+            const istekla = new Date(r.expiryDate) < danas;
+            const statusStyle = istekla ? 'color:#ef4444;font-weight:bold;' : 'color:#22c55e;font-weight:bold;';
+            const statusText = istekla ? 'ISTEKLO' : 'Aktivno';
+            const actions = userRole === 'admin' ? `<td>
+                <button class="secondary-btn" style="background:#2563eb;padding:4px 8px;font-size:0.8em;" onclick="produziRegistraciju(${index})">Produži 1 god</button>
+                <button class="secondary-btn" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteRegistracija(${index})">Obriši</button>
+            </td>` : '';
+            tbody.innerHTML += `<tr><td><strong>${r.voziloModel}</strong></td><td>${r.voziloReg}</td><td>${r.expiryDate}</td><td style="${statusStyle}">${statusText}</td>${actions}</tr>`;
         });
     }
 
     function produziRegistraciju(index) {
         let r = registracije[index];
-        let stariDatum = new Date(r.expiryDate);
-        stariDatum.setFullYear(stariDatum.getFullYear() + 1);
-        r.expiryDate = stariDatum.toISOString().split('T')[0];
-        
+        let d = new Date(r.expiryDate);
+        d.setFullYear(d.getFullYear() + 1);
+        r.expiryDate = d.toISOString().split('T')[0];
         db.ref('registracije').set(registracije);
-        alert(`Registracija za ${r.voziloModel} (${r.voziloReg}) je uspešno produžena za godinu dana!`);
     }
 
-    function proveriIstekeRegistracija() {
-        const danas = new Date();
-        registracije.forEach(r => {
-            const datumIsteka = new Date(r.expiryDate);
-            const razlikaDana = Math.ceil((datumIsteka - danas) / (1000 * 60 * 60 * 24));
-            if (razlikaDana <= 7 && razlikaDana >= 0) {
-                console.log(`Pažnja: Registracija za vozilo ${r.voziloModel} (${r.voziloReg}) ističe za ${razlikaDana} dana!`);
-            }
-        });
-    }
+    function deleteRegistracija(index) { if (confirm('Obrisati?')) { registracije.splice(index, 1); db.ref('registracije').set(registracije); } }
 
-    function deleteRegistracija(index) {
-        if (confirm('Obrisati evidenciju registracije?')) {
-            registracije.splice(index, 1);
-            db.ref('registracije').set(registracije);
-        }
-    }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-    function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; }
-
-    // Čuvanje zadatka
     function saveTask() {
         const date = document.getElementById('eventDate').value;
         const color = document.getElementById('eventColor').value;
-
         const checkboxes = document.querySelectorAll('.worker-checkbox:checked');
         let selectedWorkers = [];
         checkboxes.forEach(cb => {
@@ -739,10 +621,7 @@
             if (s) selectedWorkers.push(s);
         });
 
-        if (selectedWorkers.length === 0) {
-            alert('Izaberite bar jednog servisera za tim!');
-            return;
-        }
+        if (selectedWorkers.length === 0) return alert('Izaberite servisere!');
 
         const rows = document.getElementsByClassName('location-row');
         let locations = [];
@@ -753,19 +632,17 @@
             if (address) locations.push({ address, time, contact });
         }
 
-        if (locations.length === 0) { alert('Morate uneti bar jednu lokaciju!'); return; }
+        if (locations.length === 0) return alert('Uneti bar jednu lokaciju!');
 
         if (!tasks[date]) tasks[date] = [];
         tasks[date].push({ id: Date.now().toString(), workers: selectedWorkers, locations, color });
-        
-        db.ref('tasks').set(tasks); // Čuvanje rasporeda u Firebase
+        db.ref('tasks').set(tasks);
         closeModal('eventModal');
     }
 
-    // Pregled knjige
     function openBookView(dateString) { openBookViewAt(dateString, 0); }
     function openBookViewAt(dateString, index) {
-        if (!tasks[dateString] || tasks[dateString].length === 0) { alert('Nema uneta zaduženja za ovaj dan.'); return; }
+        if (!tasks[dateString] || tasks[dateString].length === 0) return;
         currentBookDate = dateString;
         currentBookIndex = index;
         document.getElementById('bookModal').style.display = 'flex';
@@ -787,41 +664,27 @@
         const counter = document.getElementById('bookCounter');
         const navControls = document.getElementById('bookNavControls');
 
-        if (!dayTasks || dayTasks.length === 0) {
-            closeModal('bookModal');
-            return;
-        }
+        if (!dayTasks || dayTasks.length === 0) { closeModal('bookModal'); return; }
 
         navControls.style.display = dayTasks.length > 1 ? 'flex' : 'none';
         counter.innerText = `${currentBookIndex + 1} / ${dayTasks.length}`;
 
         const task = dayTasks[currentBookIndex];
-        
         let workersHtml = '';
         if (task.workers) {
             task.workers.forEach((w, idx) => {
-                workersHtml += `
-                    <div class="qr-badge" style="margin-bottom: 6px;">
-                        <img src="${w.qr}" alt="QR">
-                        <div>
-                            <h4 style="margin-bottom: 2px;">👤 S${idx + 1}: ${w.name}</h4>
-                            <div style="font-size: 0.85em; opacity: 0.8;">ID: <strong>${w.id}</strong></div>
-                        </div>
-                    </div>`;
+                workersHtml += `<div class="qr-badge" style="margin-bottom:6px;"><img src="${w.qr}"><div><h4>👤 S${idx + 1}: ${w.name}</h4><div style="font-size:0.85em;opacity:0.8;">ID: <strong>${w.id}</strong></div></div></div>`;
             });
         }
 
         let locationsHtml = '';
         if (task.locations) {
             task.locations.forEach((loc, idx) => {
-                locationsHtml += `
-                    <div style="background: rgba(0,0,0,0.03); padding: 6px; border-radius: 4px; margin-top: 4px;">
-                        <div><strong>#${idx + 1} Adresa:</strong> ${loc.address}</div>
-                        <div><strong>Vreme:</strong> ${loc.time || 'Nije fiksirano'}</div>
-                        <div><strong>Kontakt:</strong> ${loc.contact || 'Nema kontakta'}</div>
-                    </div>`;
+                locationsHtml += `<div style="background:rgba(0,0,0,0.03);padding:6px;border-radius:4px;margin-top:4px;"><div><strong>#${idx + 1} Adresa:</strong> ${loc.address}</div><div><strong>Vreme:</strong> ${loc.time || 'Nije fiksirano'}</div><div><strong>Kontakt:</strong> ${loc.contact || 'Nema kontakta'}</div></div>`;
             });
         }
+
+        const deleteBtn = userRole === 'admin' ? `<button class="secondary-btn" style="background-color:#ef4444;margin-top:10px;" onclick="deleteTask('${currentBookDate}', ${currentBookIndex})">Obriši ovo zaduženje</button>` : '';
 
         body.innerHTML = `
             <div class="task-detail-card" style="border-left: 5px solid ${task.color};">
@@ -829,19 +692,18 @@
                 ${workersHtml}
                 <div style="margin-top: 10px; font-weight: bold;">Raspored lokacija:</div>
                 <div style="max-height: 150px; overflow-y: auto;">${locationsHtml}</div>
-                <button class="secondary-btn" style="background-color: #ef4444; margin-top: 10px;" onclick="deleteTask('${currentBookDate}', ${currentBookIndex})">Obriši ovo zaduženje</button>
+                ${deleteBtn}
             </div>`;
     }
 
     function deleteTask(dateString, index) {
-        if (confirm('Obrisati ovo zaduženje?')) {
+        if (userRole !== 'admin') return;
+        if (confirm('Obrisati zaduženje?')) {
             tasks[dateString].splice(index, 1);
             if (tasks[dateString].length === 0) delete tasks[dateString];
             db.ref('tasks').set(tasks);
         }
     }
-
-    window.onload = init;
 </script>
 </body>
 </html>
