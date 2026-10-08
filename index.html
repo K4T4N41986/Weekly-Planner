@@ -29,22 +29,27 @@
         body { background-color: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; height: 100dvh; overflow: hidden; transition: 0.3s; }
         
         /* Header */
-        header { background-color: var(--header-bg); color: var(--header-text); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .date-time { font-weight: bold; font-size: 1.1em; }
-        .header-actions { display: flex; gap: 10px; align-items: center; }
-        .theme-toggle { background: var(--btn-bg); color: #fff; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 600; }
+        header { background-color: var(--header-bg); color: var(--header-text); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px; }
+        .date-time { font-weight: bold; font-size: 1em; }
+        .nav-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+        .tab-btn { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 600; transition: 0.2s; }
+        .tab-btn:hover, .tab-btn.active { background: var(--btn-bg); border-color: var(--btn-bg); }
         
-        /* Main Container - Responsive Layout */
+        .header-actions { display: flex; gap: 10px; align-items: center; }
+        .theme-toggle { background: var(--btn-bg); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 600; }
+        
+        /* Main Container - Views */
+        .main-view { display: none; flex-grow: 1; overflow: auto; padding: 15px; }
+        .main-view.active-view { display: flex; flex-direction: column; }
+
+        /* Raspored Nedelje Grid */
         .week-container { 
             display: grid; 
             grid-template-columns: repeat(7, 1fr); 
             flex-grow: 1; 
             overflow: auto; 
-            padding: 15px; 
             gap: 12px; 
         }
-        
-        /* Mobilni prikaz: dani jedan ispod drugog */
         @media (max-width: 1024px) {
             .week-container { grid-template-columns: 1fr; }
         }
@@ -74,7 +79,6 @@
         .day-name { font-weight: bold; font-size: 1.05em; }
         .day-date { font-size: 0.85em; opacity: 0.8; }
         
-        /* Plus dugme u gornjem desnom uglu dana */
         .add-task-btn { 
             background-color: var(--btn-bg); 
             color: white; 
@@ -93,9 +97,8 @@
         }
         .add-task-btn:hover { transform: scale(1.1); background-color: var(--btn-hover); }
 
-        .events-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: calc(100vh - 180px); }
+        .events-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: calc(100vh - 220px); }
         
-        /* Kompaktna kartica zaduženja */
         .event-card { 
             padding: 10px; 
             border-radius: 6px; 
@@ -110,17 +113,16 @@
 
         /* Footer navigation */
         footer { background-color: var(--header-bg); padding: 10px 20px; display: flex; justify-content: space-between; flex-shrink: 0; }
-        .nav-btn { background-color: var(--btn-bg); color: #fff; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; }
+        .nav-btn { background-color: var(--btn-bg); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9em; }
         .nav-btn:hover { background-color: var(--btn-hover); }
 
-        /* Modal za unos zadatka */
+        /* Modal / Form Styling */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 1000; padding: 15px; }
-        .modal-content { background-color: var(--card-bg); padding: 20px; border-radius: 10px; width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .modal-content { background-color: var(--card-bg); padding: 20px; border-radius: 10px; width: 100%; max-width: 550px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
         .modal-content h3 { text-align: center; margin-bottom: 5px; }
         
         input, select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); color: var(--text-color); font-size: 0.95em; }
         
-        /* Lokacije sekcija u formi */
         .locations-container { display: flex; flex-direction: column; gap: 8px; border: 1px dashed var(--border-color); padding: 10px; border-radius: 6px; }
         .location-item { display: flex; gap: 6px; align-items: center; }
         
@@ -129,7 +131,12 @@
         .cancel-btn { background-color: #ef4444; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; }
         .secondary-btn { background-color: var(--btn-bg); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: bold; }
 
-        /* Modal za prelistavanje dana (Pregled knjige) */
+        /* Tabele za Servisere, Vozila, Registracije */
+        .admin-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
+        .admin-table th, .admin-table td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; }
+        .admin-table th { background-color: rgba(0,0,0,0.05); }
+
+        /* Pregled knjige */
         .book-modal-body { display: flex; flex-direction: column; gap: 15px; min-height: 250px; }
         .book-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
         .task-detail-card { background: var(--bg-color); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; }
@@ -141,34 +148,82 @@
 
     <header>
         <div class="date-time" id="clock">Datum i Vreme</div>
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchView('planner')">Raspored</button>
+            <button class="tab-btn" onclick="switchView('serviseri')">SERVISERI</button>
+            <button class="tab-btn" onclick="switchView('vozila')">VOZILA</button>
+            <button class="tab-btn" onclick="switchView('registracije')">REGISTRACIJE</button>
+        </div>
         <div class="header-actions">
             <button class="theme-toggle" onclick="toggleTheme()">Mod</button>
         </div>
     </header>
 
-    <div class="week-container" id="weekContainer">
-        <!-- Dani se generišu dinamički preko JavaScript-a -->
+    <!-- PLANER VIEW -->
+    <div id="view-planner" class="main-view active-view" style="flex-grow: 1; padding: 15px; display: flex; flex-direction: column; overflow: hidden;">
+        <div class="week-container" id="weekContainer">
+            <!-- Dani se generišu dinamički -->
+        </div>
+        <footer style="margin: -15px; margin-top: 15px;">
+            <button class="nav-btn" onclick="changeWeek(-1)">◀ Prethodna nedelja</button>
+            <button class="nav-btn" onclick="changeWeek(1)">Sledeća nedelja ▶</button>
+        </footer>
     </div>
 
-    <footer>
-        <button class="nav-btn" onclick="changeWeek(-1)">◀ Prethodna nedelja</button>
-        <button class="nav-btn" onclick="changeWeek(1)">Sledeća nedelja ▶</button>
-    </footer>
+    <!-- SERVISERI VIEW -->
+    <div id="view-serviseri" class="main-view">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Upravljanje Serviserima / Zaposlenima</h2>
+            <button class="secondary-btn" onclick="openServiserModal()">+ Dodaj novog servisera</button>
+        </div>
+        <div style="overflow-x: auto;">
+            <table class="admin-table" id="serviseriTable">
+                <thead>
+                    <tr>
+                        <th>Ime i prezime</th>
+                        <th>Šestocifreni ID</th>
+                        <th>QR Kod</th>
+                        <th>Akcije</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- VOZILA VIEW -->
+    <div id="view-vozila" class="main-view">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Spisak Vozila</h2>
+            <button class="secondary-btn" onclick="alert('Funkcija za dodavanje vozila u izradi')">+ Dodaj vozilo</button>
+        </div>
+        <p style="opacity: 0.8;">Ovde će se voditi evidencija službenih vozila i opreme.</p>
+    </div>
+
+    <!-- REGISTRACIJE VIEW -->
+    <div id="view-registracije" class="main-view">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Datum Registracije Vozila</h2>
+            <button class="secondary-btn" onclick="alert('Funkcija za praćenje registracija u izradi')">+ Unesi registraciju</button>
+        </div>
+        <p style="opacity: 0.8;">Ovde se prate datumi isteka registracija i osiguranja.</p>
+    </div>
 
     <!-- MODAL ZA UNOS ZADATKA -->
     <div class="modal" id="eventModal">
         <div class="modal-content">
-            <h3 id="modalTitle">Unos zaduženja za tim</h3>
+            <h3 id="modalTitle">Unos zaduženja za dan</h3>
             <input type="hidden" id="eventDate">
             
             <div>
-                <label style="font-size: 0.85em; opacity: 0.8;">Ime i prezime radnika / tima:</label>
-                <input type="text" id="workerName" placeholder="npr. Marko Marković (Tim A)">
+                <label style="font-size: 0.85em; opacity: 0.8;">Izaberi servisera / tim:</label>
+                <select id="workerSelect" style="font-weight: bold;">
+                    <!-- Popunjava se dinamički iz baze serviserai -->
+                </select>
             </div>
 
             <div class="locations-container" id="locationsContainer">
                 <label style="font-size: 0.85em; font-weight: bold;">Lokacije, vreme i kontakt:</label>
-                <!-- Dinamička polja za lokacije -->
             </div>
             <button type="button" class="secondary-btn" onclick="addLocationField()">+ Dodaj još jednu lokaciju</button>
 
@@ -191,13 +246,30 @@
         </div>
     </div>
 
+    <!-- MODAL ZA DODAVANJE/UREĐIVANJE SERVISERA -->
+    <div class="modal" id="serviserModal">
+        <div class="modal-content">
+            <h3>Unos novog servisera</h3>
+            <div>
+                <label style="font-size: 0.85em; opacity: 0.8;">Ime i prezime:</label>
+                <input type="text" id="newServiserName" placeholder="npr. Petar Petrović">
+            </div>
+            <div>
+                <label style="font-size: 0.85em; opacity: 0.8;">Šestocifreni ID (ostavi prazno za automatsko):</label>
+                <input type="text" id="newServiserId" placeholder="npr. 123456" maxlength="6">
+            </div>
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeModal('serviserModal')">Odustani</button>
+                <button class="save-btn" onclick="saveServiser()">Sačuvaj servisera</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL ZA PRELISTAVANJE DANA (POGLED KNJIGE) -->
     <div class="modal" id="bookModal">
         <div class="modal-content">
             <h3 id="bookModalTitle">Pregled zaduženja za dan</h3>
-            <div class="book-modal-body" id="bookModalBody">
-                <!-- Sadržaj kartica za listanje -->
-            </div>
+            <div class="book-modal-body" id="bookModalBody"></div>
             <div class="book-nav" id="bookNavControls">
                 <button class="secondary-btn" onclick="changeBookCard(-1)">◀ Prethodni tim</button>
                 <span id="bookCounter" style="font-weight: bold; font-size: 0.9em;">1 / 1</span>
@@ -212,11 +284,13 @@
 <script>
     let currentDate = new Date();
     let tasks = JSON.parse(localStorage.getItem('business_planner_tasks')) || {};
+    let serviseri = JSON.parse(localStorage.getItem('business_planner_serviseri')) || [
+        { name: "Marko Marković", id: "100001", qr: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ID:100001-Name:Marko%20Marković" },
+        { name: "Jovan Jovanović", id: "100002", qr: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ID:100002-Name:Jovan%20Jovanović" }
+    ];
     
-    // Stanje za prelistavanje u "knjizi"
     let currentBookDate = '';
     let currentBookIndex = 0;
-
     const daysInWeek = ['Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja'];
 
     function init() {
@@ -226,6 +300,7 @@
         updateClock();
         setInterval(updateClock, 1000);
         renderWeek();
+        renderServiseriTable();
     }
 
     function toggleTheme() {
@@ -245,6 +320,27 @@
         document.getElementById('clock').innerText = now.toLocaleDateString('sr-RS', options);
     }
 
+    function switchView(viewName) {
+        document.querySelectorAll('.main-view').forEach(v => v.classList.remove('active-view'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        
+        if (viewName === 'planner') {
+            document.getElementById('view-planner').classList.add('active-view');
+            event.target.classList.add('active');
+            renderWeek();
+        } else if (viewName === 'serviseri') {
+            document.getElementById('view-serviseri').classList.add('active-view');
+            event.target.classList.add('active');
+            renderServiseriTable();
+        } else if (viewName === 'vozila') {
+            document.getElementById('view-vozila').classList.add('active-view');
+            event.target.classList.add('active');
+        } else if (viewName === 'registracije') {
+            document.getElementById('view-registracije').classList.add('active-view');
+            event.target.classList.add('active');
+        }
+    }
+
     function getStartOfWeek(date) {
         const d = new Date(date);
         const day = d.getDay();
@@ -260,7 +356,6 @@
     function renderWeek() {
         const container = document.getElementById('weekContainer');
         container.innerHTML = '';
-        
         const startOfWeek = getStartOfWeek(currentDate);
 
         for (let i = 0; i < 7; i++) {
@@ -270,7 +365,6 @@
 
             const col = document.createElement('div');
             col.className = 'day-column';
-
             const displayDate = currentDay.toLocaleDateString('sr-RS', {day: 'numeric', month: 'numeric'});
             
             col.innerHTML = `
@@ -284,7 +378,6 @@
                 <div class="events-list" id="tasks-${dateString}"></div>
             `;
             container.appendChild(col);
-
             renderTasksForDay(dateString);
         }
     }
@@ -312,15 +405,34 @@
         }
     }
 
-    // Upravljanje formom za unos lokacija
+    // Upravljanje unosom zaduženja uz automatski fokus
     function openAddModal(date) {
+        if (serviseri.length === 0) {
+            alert('Prvo unesite bar jednog servisera u tabu SERVISERI!');
+            switchView('serviseri');
+            return;
+        }
+
         document.getElementById('eventModal').style.display = 'flex';
         document.getElementById('eventDate').value = date;
-        document.getElementById('workerName').value = '';
+        
+        // Popuni select opcijama iz baze serviserai
+        const select = document.getElementById('workerSelect');
+        select.innerHTML = '';
+        serviseri.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = `${s.name} (ID: ${s.id})`;
+            select.appendChild(opt);
+        });
+
         document.getElementById('locationsContainer').innerHTML = `
             <label style="font-size: 0.85em; font-weight: bold;">Lokacije, vreme i kontakt:</label>
         `;
-        addLocationField(); // Dodaj prvu obaveznu lokaciju
+        addLocationField();
+        
+        // Automatski fokus na odabir radnika
+        setTimeout(() => select.focus(), 100);
     }
 
     function addLocationField(address = '', time = '', contact = '') {
@@ -339,6 +451,79 @@
             </div>
         `;
         container.appendChild(row);
+
+        // Automatski fokus na novo uneto polje za adresu
+        const addressInput = row.getElementsByClassName('loc-address')[0];
+        setTimeout(() => addressInput.focus(), 100);
+    }
+
+    // Upravljanje bazom serviserai
+    function openServiserModal() {
+        document.getElementById('serviserModal').style.display = 'flex';
+        document.getElementById('newServiserName').value = '';
+        document.getElementById('newServiserId').value = '';
+        setTimeout(() => document.getElementById('newServiserName').focus(), 100);
+    }
+
+    function saveServiser() {
+        const name = document.getElementById('newServiserName').value.trim();
+        let servId = document.getElementById('newServiserId').value.trim();
+
+        if (!name) {
+            alert('Unesite ime i prezime servisera!');
+            return;
+        }
+
+        if (!servId) {
+            servId = Math.floor(100000 + Math.random() * 900000).toString();
+        } else if (servId.length !== 6 || isNaN(servId)) {
+            alert('ID mora imati tačno 6 cifara!');
+            return;
+        }
+
+        // Provera da li ID već postoji
+        if (serviseri.some(s => s.id === servId)) {
+            alert('Ovaj ID već postoji! Unesite drugi ili ostavite prazno za automatsko generisanje.');
+            return;
+        }
+
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ID:${servId}-Name:${encodeURIComponent(name)}`;
+
+        serviseri.push({ name, id: servId, qr: qrCodeUrl });
+        localStorage.setItem('business_planner_serviseri', JSON.stringify(serviseri));
+
+        closeModal('serviserModal');
+        renderServiseriTable();
+        alert(`Serviser ${name} uspešno sačuvan sa ID-jem: ${servId}`);
+    }
+
+    function renderServiseriTable() {
+        const tbody = document.querySelector('#serviseriTable tbody');
+        tbody.innerHTML = '';
+
+        if (serviseri.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nema unetih servisera.</td></tr>';
+            return;
+        }
+
+        serviseri.forEach((s, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${s.name}</strong></td>
+                <td>${s.id}</td>
+                <td><img src="${s.qr}" style="width: 40px; height: 40px; vertical-align: middle;"></td>
+                <td><button class="secondary-btn" style="background-color: #ef4444; padding: 4px 8px; font-size: 0.8em;" onclick="deleteServiser(${index})">Obriši</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function deleteServiser(index) {
+        if (confirm('Da li ste sigurni da želite da obrišete ovog servisera?')) {
+            serviseri.splice(index, 1);
+            localStorage.setItem('business_planner_serviseri', JSON.stringify(serviseri));
+            renderServiseriTable();
+        }
     }
 
     function closeModal(modalId) {
@@ -347,11 +532,12 @@
 
     function saveTask() {
         const date = document.getElementById('eventDate').value;
-        const workerName = document.getElementById('workerName').value.trim();
+        const workerId = document.getElementById('workerSelect').value;
         const color = document.getElementById('eventColor').value;
 
-        if (!workerName) {
-            alert('Unesite ime radnika ili tima!');
+        const serviser = serviseri.find(s => s.id === workerId);
+        if (!serviser) {
+            alert('Izaberite važećeg servisera!');
             return;
         }
 
@@ -373,17 +559,13 @@
             return;
         }
 
-        // Generisanje jedinstvenog 6-cifrenog ID-ja i QR koda
-        const workerId = Math.floor(100000 + Math.random() * 900000).toString();
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ID:${workerId}-Name:${encodeURIComponent(workerName)}`;
-
         if (!tasks[date]) tasks[date] = [];
 
         const newTask = {
             id: Date.now().toString(),
-            workerName,
-            workerId,
-            qrCodeUrl,
+            workerName: serviser.name,
+            workerId: serviser.id,
+            qrCodeUrl: serviser.qr,
             locations,
             color
         };
@@ -393,9 +575,7 @@
 
         renderTasksForDay(date);
         closeModal('eventModal');
-
-        // Simulacija slanja notifikacije radniku
-        alert(`Zaduženje uspešno sačuvano!\n\nRadniku ${workerName} je dodeljen ID: ${workerId}.\nPoslata je automatska notifikacija.`);
+        alert(`Zaduženje za ${serviser.name} uspešno sačuvano!`);
     }
 
     // PREGLEDI KROZ LISTANJE (KNJIGA)
