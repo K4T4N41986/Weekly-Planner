@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Poslovni Planer - Terenske Ekipe</title>
+    
+    <!-- Firebase SDK (Compat verzija za direktan rad u pretraživaču) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
     <style>
         :root {
             --bg-color: #f4f7f6;
@@ -124,14 +129,13 @@
         input, select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); color: var(--text-color); font-size: 0.95em; }
         
         .locations-container { display: flex; flex-direction: column; gap: 8px; border: 1px dashed var(--border-color); padding: 10px; border-radius: 6px; }
-        .location-item { display: flex; gap: 6px; align-items: center; }
         
         .modal-actions { display: flex; justify-content: space-between; margin-top: 10px; gap: 10px; }
         .save-btn { background-color: #22c55e; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; }
         .cancel-btn { background-color: #ef4444; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; }
         .secondary-btn { background-color: var(--btn-bg); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: bold; }
 
-        /* Tabele za Servisere, Vozila, Registracije */
+        /* Tabele */
         .admin-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
         .admin-table th, .admin-table td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; }
         .admin-table th { background-color: rgba(0,0,0,0.05); }
@@ -240,7 +244,6 @@
             <div>
                 <label style="font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 5px;">Izaberite članove tima (servisere):</label>
                 <div id="workersCheckboxContainer" style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 5px; background: var(--bg-color);">
-                    <!-- Generiše se dinamički -->
                 </div>
             </div>
 
@@ -342,16 +345,26 @@
     </div>
 
 <script>
+    // 1. Inicijalizacija Firebase-a
+    const firebaseConfig = {
+      apiKey: "AIzaSyC4LnY6l1cjzHrwxiYhQc-0LoVwhk7IjVM",
+      authDomain: "planer-22ce9.firebaseapp.com",
+      databaseURL: "https://planer-22ce9-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "planer-22ce9",
+      storageBucket: "planer-22ce9.firebasestorage.app",
+      messagingSenderId: "640110002382",
+      appId: "1:640110002382:web:adb54803d437bb827c509f"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Globalne promenljive
     let currentDate = new Date();
-    let tasks = JSON.parse(localStorage.getItem('business_planner_tasks')) || {};
-    let serviseri = JSON.parse(localStorage.getItem('business_planner_serviseri')) || [
-        { name: "Marko Marković", id: "100001", qr: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ID:100001-Name:Marko%20Marković" },
-        { name: "Jovan Jovanović", id: "100002", qr: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ID:100002-Name:Jovan%20Jovanović" }
-    ];
-    let vozila = JSON.parse(localStorage.getItem('business_planner_vozila')) || [
-        { model: "Fiat Doblò", reg: "BG1294-AJ" }
-    ];
-    let registracije = JSON.parse(localStorage.getItem('business_planner_registracije')) || [];
+    let tasks = {};
+    let serviseri = [];
+    let vozila = [];
+    let registracije = [];
     
     let currentBookDate = '';
     let currentBookIndex = 0;
@@ -363,11 +376,31 @@
         }
         updateClock();
         setInterval(updateClock, 1000);
-        renderWeek();
-        renderServiseriTable();
-        renderVozilaTable();
-        renderRegistracijeTable();
-        proveriIstekeRegistracija();
+
+        // Povezivanje na Firebase Realtime Bazu (Uživo slušanje promena)
+        db.ref('tasks').on('value', snapshot => {
+            tasks = snapshot.val() || {};
+            renderWeek();
+            if (currentBookDate && document.getElementById('bookModal').style.display === 'flex') {
+                renderBookCard();
+            }
+        });
+
+        db.ref('serviseri').on('value', snapshot => {
+            serviseri = snapshot.val() || [];
+            renderServiseriTable();
+        });
+
+        db.ref('vozila').on('value', snapshot => {
+            vozila = snapshot.val() || [];
+            renderVozilaTable();
+        });
+
+        db.ref('registracije').on('value', snapshot => {
+            registracije = snapshot.val() || [];
+            renderRegistracijeTable();
+            proveriIstekeRegistracija();
+        });
     }
 
     function toggleTheme() {
@@ -463,7 +496,7 @@
                 card.style.backgroundColor = task.color;
                 card.onclick = () => openBookViewAt(dateString, index);
                 
-                let workersText = task.workers.map(w => w.name).join(', ');
+                let workersText = task.workers ? task.workers.map(w => w.name).join(', ') : 'Nepoznato';
                 card.innerHTML = `
                     <div style="font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 3px; margin-bottom: 4px;">
                         👥 ${workersText}
@@ -475,7 +508,6 @@
         }
     }
 
-    // Modal za unose zaduženja sa više serviserâ
     function openAddModal(date) {
         if (serviseri.length === 0) {
             alert('Prvo unesite bar jednog servisera u tabu SERVISERI!');
@@ -522,7 +554,7 @@
         setTimeout(() => addressInput.focus(), 100);
     }
 
-    // Serviseri tab
+    // Serviseri akcije
     function openServiserModal() {
         document.getElementById('serviserModal').style.display = 'flex';
         document.getElementById('newServiserName').value = '';
@@ -549,10 +581,9 @@
 
         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ID:${servId}-Name:${encodeURIComponent(name)}`;
         serviseri.push({ name, id: servId, qr: qrCodeUrl });
-        localStorage.setItem('business_planner_serviseri', JSON.stringify(serviseri));
-
+        
+        db.ref('serviseri').set(serviseri); // Čuvanje u Firebase
         closeModal('serviserModal');
-        renderServiseriTable();
     }
 
     function renderServiseriTable() {
@@ -576,12 +607,11 @@
     function deleteServiser(index) {
         if (confirm('Obrisati ovog servisera?')) {
             serviseri.splice(index, 1);
-            localStorage.setItem('business_planner_serviseri', JSON.stringify(serviseri));
-            renderServiseriTable();
+            db.ref('serviseri').set(serviseri);
         }
     }
 
-    // Vozila tab
+    // Vozila akcije
     function openVoziloModal() {
         document.getElementById('voziloModal').style.display = 'flex';
         document.getElementById('newVoziloModel').value = '';
@@ -595,9 +625,8 @@
         if (!model || !reg) { alert('Unesite marku/model i registraciju!'); return; }
 
         vozila.push({ model, reg });
-        localStorage.setItem('business_planner_vozila', JSON.stringify(vozila));
+        db.ref('vozila').set(vozila); // Čuvanje u Firebase
         closeModal('voziloModal');
-        renderVozilaTable();
     }
 
     function renderVozilaTable() {
@@ -616,12 +645,11 @@
     function deleteVozilo(index) {
         if (confirm('Obrisati vozilo?')) {
             vozila.splice(index, 1);
-            localStorage.setItem('business_planner_vozila', JSON.stringify(vozila));
-            renderVozilaTable();
+            db.ref('vozila').set(vozila);
         }
     }
 
-    // Registracije tab i automatsko obnavljanje
+    // Registracije akcije
     function openRegistracijaModal() {
         if (vozila.length === 0) { alert('Prvo unesite vozilo u tabu VOZILA!'); switchView('vozila'); return; }
         document.getElementById('registracijaModal').style.display = 'flex';
@@ -640,9 +668,8 @@
 
         const v = vozila[voziloIndex];
         registracije.push({ voziloModel: v.model, voziloReg: v.reg, expiryDate });
-        localStorage.setItem('business_planner_registracije', JSON.stringify(registracije));
+        db.ref('registracije').set(registracije); // Čuvanje u Firebase
         closeModal('registracijaModal');
-        renderRegistracijeTable();
     }
 
     function renderRegistracijeTable() {
@@ -676,9 +703,8 @@
         stariDatum.setFullYear(stariDatum.getFullYear() + 1);
         r.expiryDate = stariDatum.toISOString().split('T')[0];
         
-        localStorage.setItem('business_planner_registracije', JSON.stringify(registracije));
-        renderRegistracijeTable();
-        alert(`Registracija za ${r.voziloModel} (${r.voziloReg}) je uspešno produžena za godinu dana i sada važi do ${r.expiryDate}!`);
+        db.ref('registracije').set(registracije);
+        alert(`Registracija za ${r.voziloModel} (${r.voziloReg}) je uspešno produžena za godinu dana!`);
     }
 
     function proveriIstekeRegistracija() {
@@ -695,14 +721,13 @@
     function deleteRegistracija(index) {
         if (confirm('Obrisati evidenciju registracije?')) {
             registracije.splice(index, 1);
-            localStorage.setItem('business_planner_registracije', JSON.stringify(registracije));
-            renderRegistracijeTable();
+            db.ref('registracije').set(registracije);
         }
     }
 
     function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; }
 
-    // Čuvanje zadatka sa više serviserâ
+    // Čuvanje zadatka
     function saveTask() {
         const date = document.getElementById('eventDate').value;
         const color = document.getElementById('eventColor').value;
@@ -732,11 +757,9 @@
 
         if (!tasks[date]) tasks[date] = [];
         tasks[date].push({ id: Date.now().toString(), workers: selectedWorkers, locations, color });
-        localStorage.setItem('business_planner_tasks', JSON.stringify(tasks));
-
-        renderTasksForDay(date);
+        
+        db.ref('tasks').set(tasks); // Čuvanje rasporeda u Firebase
         closeModal('eventModal');
-        alert('Zaduženje tima uspešno sačuvano!');
     }
 
     // Pregled knjige
@@ -764,32 +787,41 @@
         const counter = document.getElementById('bookCounter');
         const navControls = document.getElementById('bookNavControls');
 
+        if (!dayTasks || dayTasks.length === 0) {
+            closeModal('bookModal');
+            return;
+        }
+
         navControls.style.display = dayTasks.length > 1 ? 'flex' : 'none';
         counter.innerText = `${currentBookIndex + 1} / ${dayTasks.length}`;
 
         const task = dayTasks[currentBookIndex];
         
         let workersHtml = '';
-        task.workers.forEach((w, idx) => {
-            workersHtml += `
-                <div class="qr-badge" style="margin-bottom: 6px;">
-                    <img src="${w.qr}" alt="QR">
-                    <div>
-                        <h4 style="margin-bottom: 2px;">👤 S${idx + 1}: ${w.name}</h4>
-                        <div style="font-size: 0.85em; opacity: 0.8;">ID: <strong>${w.id}</strong></div>
-                    </div>
-                </div>`;
-        });
+        if (task.workers) {
+            task.workers.forEach((w, idx) => {
+                workersHtml += `
+                    <div class="qr-badge" style="margin-bottom: 6px;">
+                        <img src="${w.qr}" alt="QR">
+                        <div>
+                            <h4 style="margin-bottom: 2px;">👤 S${idx + 1}: ${w.name}</h4>
+                            <div style="font-size: 0.85em; opacity: 0.8;">ID: <strong>${w.id}</strong></div>
+                        </div>
+                    </div>`;
+            });
+        }
 
         let locationsHtml = '';
-        task.locations.forEach((loc, idx) => {
-            locationsHtml += `
-                <div style="background: rgba(0,0,0,0.03); padding: 6px; border-radius: 4px; margin-top: 4px;">
-                    <div><strong>#${idx + 1} Adresa:</strong> ${loc.address}</div>
-                    <div><strong>Vreme:</strong> ${loc.time || 'Nije fiksirano'}</div>
-                    <div><strong>Kontakt:</strong> ${loc.contact || 'Nema kontakta'}</div>
-                </div>`;
-        });
+        if (task.locations) {
+            task.locations.forEach((loc, idx) => {
+                locationsHtml += `
+                    <div style="background: rgba(0,0,0,0.03); padding: 6px; border-radius: 4px; margin-top: 4px;">
+                        <div><strong>#${idx + 1} Adresa:</strong> ${loc.address}</div>
+                        <div><strong>Vreme:</strong> ${loc.time || 'Nije fiksirano'}</div>
+                        <div><strong>Kontakt:</strong> ${loc.contact || 'Nema kontakta'}</div>
+                    </div>`;
+            });
+        }
 
         body.innerHTML = `
             <div class="task-detail-card" style="border-left: 5px solid ${task.color};">
@@ -805,10 +837,7 @@
         if (confirm('Obrisati ovo zaduženje?')) {
             tasks[dateString].splice(index, 1);
             if (tasks[dateString].length === 0) delete tasks[dateString];
-            localStorage.setItem('business_planner_tasks', JSON.stringify(tasks));
-            renderTasksForDay(dateString);
-            if (!tasks[dateString] || tasks[dateString].length === 0) closeModal('bookModal');
-            else { currentBookIndex = 0; renderBookCard(); }
+            db.ref('tasks').set(tasks);
         }
     }
 
