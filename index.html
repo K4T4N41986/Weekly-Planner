@@ -71,6 +71,7 @@
         .day-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-bottom: 10px; }
         .day-title-info { cursor: pointer; flex-grow: 1; }
         .day-title-info:hover { opacity: 0.8; }
+        .day-name-date-wrapper { display: flex; align-items: baseline; gap: 8px; }
         .day-name { font-weight: bold; font-size: 1.05em; }
         .day-date { font-size: 0.85em; opacity: 0.8; }
         
@@ -145,7 +146,7 @@
             <div class="header-actions">
                 <span id="userBadge" style="font-size: 0.8em; opacity: 0.9; font-weight: bold;"></span>
                 <button class="theme-toggle" onclick="toggleTheme()">Tema</button>
-                <button class="logout-btn" onclick="handleLogout()">Prijava/Odjava</button>
+                <button class="logout-btn" onclick="handleLogout()">Odjava</button>
             </div>
         </header>
 
@@ -169,8 +170,8 @@
                     <thead>
                         <tr>
                             <th>Ime i prezime</th>
-                            <th>Šestocifreni ID</th>
-                            <th>QR Kod</th>
+                            <th class="admin-only">Šestocifreni ID</th>
+                            <th class="admin-only">QR Kod</th>
                             <th class="admin-only">Akcije</th>
                         </tr>
                     </thead>
@@ -227,14 +228,31 @@
         <div class="modal-content">
             <h3>Unos zaduženja za dan</h3>
             <input type="hidden" id="eventDate">
+            <input type="hidden" id="editTaskIndex" value="-1">
+            
             <div>
-                <label style="font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 5px;">Izaberite članove tima:</label>
-                <div id="workersCheckboxContainer" style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 5px; background: var(--bg-color);"></div>
+                <label style="font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 5px;">Članovi tima:</label>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <select id="workerSelect" style="flex: 1;">
+                        <option value="">Izaberi servisera...</option>
+                    </select>
+                    <button type="button" class="secondary-btn" onclick="addTeamMember()">Dodaj</button>
+                </div>
+                <div id="selectedWorkersContainer" style="min-height: 45px; border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 6px; background: var(--bg-color);">
+                    <!-- Izabrani članovi tima -->
+                </div>
             </div>
+
             <div class="locations-container" id="locationsContainer">
                 <label style="font-size: 0.85em; font-weight: bold;">Lokacije, vreme i kontakt:</label>
             </div>
             <button type="button" class="secondary-btn" onclick="addLocationField()">+ Dodaj još jednu lokaciju</button>
+
+            <div>
+                <label style="font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 5px;">Opis posla:</label>
+                <textarea id="taskDescription" rows="2" placeholder="Unesite opis posla..."></textarea>
+            </div>
+
             <div>
                 <label style="font-size: 0.85em; opacity: 0.8;">Boja kartice:</label>
                 <select id="eventColor">
@@ -320,26 +338,24 @@
     const auth = firebase.auth();
 
     let currentUser = null;
-    let userRole = 'serviser'; // podrazumevano
+    let userRole = 'serviser';
     let currentDate = new Date();
     let tasks = {}, serviseri = [], vozila = [], registracije = [];
     let currentBookDate = '', currentBookIndex = 0;
+    let currentSelectedWorkers = [];
     const daysInWeek = ['Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja'];
 
-    // Provera statusa prijave
     auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('appContainer').style.display = 'flex';
             
-            // Proveri ulogu u bazi
             db.ref('users/' + user.uid).once('value').then(snapshot => {
                 const userData = snapshot.val();
                 if (userData && userData.role) {
                     userRole = userData.role;
                 } else {
-                    // Ako je admin email, postavi ga automatski kao admin
                     if (user.email.includes('admin')) {
                         userRole = 'admin';
                         db.ref('users/' + user.uid).set({ email: user.email, role: 'admin' });
@@ -396,15 +412,20 @@
         setInterval(updateClock, 1000);
 
         db.ref('tasks').on('value', snapshot => { tasks = snapshot.val() || {}; renderWeek(); });
-        db.ref('serviseri').on('value', snapshot => { serviseri = snapshot.val() || []; renderServiseriTable(); });
+        db.ref('serviseri').on('value', snapshot => { serviseri = snapshot.val() || []; renderServiseriTable(); updateWorkerSelect(); });
         db.ref('vozila').on('value', snapshot => { vozila = snapshot.val() || []; renderVozilaTable(); });
         db.ref('registracije').on('value', snapshot => { registracije = snapshot.val() || []; renderRegistracijeTable(); });
     }
 
     function toggleTheme() {
         const isDark = document.body.getAttribute('data-theme') === 'dark';
-        document.body.toggleAttribute('data-theme', !isDark);
-        localStorage.setItem('theme', isDark ? 'light' : 'dark');
+        if (isDark) {
+            document.body.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'light');
+        } else {
+            document.body.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+        }
     }
 
     function updateClock() {
@@ -444,15 +465,17 @@
 
             const col = document.createElement('div');
             col.className = 'day-column';
-            const displayDate = currentDay.toLocaleDateString('sr-RS', {day: 'numeric', month: 'numeric'});
+            const displayDate = currentDay.toLocaleDateString('sr-RS', {day: 'numeric', month: 'numeric', year: 'numeric'});
             
             const addBtnHtml = userRole === 'admin' ? `<button class="add-task-btn" onclick="openAddModal('${dateString}')">+</button>` : '';
 
             col.innerHTML = `
                 <div class="day-header">
                     <div class="day-title-info" onclick="openBookView('${dateString}')">
-                        <div class="day-name">${daysInWeek[i]}</div>
-                        <div class="day-date">${displayDate}</div>
+                        <div class="day-name-date-wrapper">
+                            <span class="day-name">${daysInWeek[i]}</span>
+                            <span class="day-date">${displayDate}</span>
+                        </div>
                     </div>
                     ${addBtnHtml}
                 </div>
@@ -472,50 +495,165 @@
             tasks[dateString].forEach((task, index) => {
                 const card = document.createElement('div');
                 card.className = 'event-card';
-                card.style.backgroundColor = task.color;
+                card.style.backgroundColor = task.color || '#3b82f6';
                 card.onclick = () => openBookViewAt(dateString, index);
                 
                 let workersText = task.workers ? task.workers.map(w => w.name).join(', ') : 'Nepoznato';
+                let descSnippet = task.description ? `<div style="font-size: 0.8em; opacity: 0.9; margin-top: 2px;">📝 ${task.description}</div>` : '';
                 card.innerHTML = `
                     <div style="font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 3px; margin-bottom: 4px;">
                         👥 ${workersText}
                     </div>
                     <div style="font-size: 0.8em;">📍 Lokacija: ${task.locations[0].address} ${task.locations.length > 1 ? `(+ još ${task.locations.length - 1})` : ''}</div>
+                    ${descSnippet}
                 `;
                 list.appendChild(card);
             });
         }
     }
 
+    function updateWorkerSelect() {
+        const select = document.getElementById('workerSelect');
+        if (!select) return;
+        select.innerHTML = '<option value="">Izaberi servisera...</option>';
+        serviseri.forEach(s => {
+            select.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+        });
+    }
+
     function openAddModal(date) {
         if (userRole !== 'admin') return;
         document.getElementById('eventModal').style.display = 'flex';
         document.getElementById('eventDate').value = date;
-        const container = document.getElementById('workersCheckboxContainer');
-        container.innerHTML = '';
-        serviseri.forEach(s => {
-            container.innerHTML += `<label style="display:flex;align-items:center;gap:8px;font-size:0.9em;"><input type="checkbox" class="worker-checkbox" value="${s.id}"> <strong>${s.name}</strong> (ID: ${s.id})</label>`;
-        });
-        document.getElementById('locationsContainer').innerHTML = '<label style="font-size:0.85em;font-weight:bold;">Lokacije, vreme i kontakt:</label>';
+        document.getElementById('editTaskIndex').value = '-1';
+        currentSelectedWorkers = [];
+        renderSelectedWorkers();
+        document.getElementById('taskDescription').value = '';
+        document.getElementById('eventColor').value = '#3b82f6';
+        
+        document.getElementById('locationsContainer').innerHTML = '<label style="font-size: 0.85em; font-weight: bold;">Lokacije, vreme i kontakt:</label>';
         addLocationField();
     }
 
-    function addLocationField() {
+    function addTeamMember() {
+        const select = document.getElementById('workerSelect');
+        const sId = select.value;
+        if (!sId) return;
+        const serviser = serviseri.find(s => s.id === sId);
+        if (serviser && !currentSelectedWorkers.some(w => w.id === sId)) {
+            currentSelectedWorkers.push({ id: serviser.id, name: serviser.name });
+            renderSelectedWorkers();
+        }
+        select.value = '';
+    }
+
+    function removeTeamMember(id) {
+        currentSelectedWorkers = currentSelectedWorkers.filter(w => w.id !== id);
+        renderSelectedWorkers();
+    }
+
+    function renderSelectedWorkers() {
+        const container = document.getElementById('selectedWorkersContainer');
+        container.innerHTML = '';
+        if (currentSelectedWorkers.length === 0) {
+            container.innerHTML = '<span style="font-size:0.85em; opacity:0.6;">Nema izabranih članova.</span>';
+            return;
+        }
+        currentSelectedWorkers.forEach(w => {
+            container.innerHTML += `
+                <div style="background:var(--btn-bg); color:white; padding:4px 8px; border-radius:4px; font-size:0.85em; display:flex; align-items:center; gap:6px;">
+                    <span>${w.name}</span>
+                    <button type="button" onclick="removeTeamMember('${w.id}')" style="background:none; border:none; color:white; cursor:pointer; font-weight:bold;">&times;</button>
+                </div>
+            `;
+        });
+    }
+
+    function addLocationField(address = '', time = '', contact = '') {
         const container = document.getElementById('locationsContainer');
         const index = container.getElementsByClassName('location-row').length + 1;
         const row = document.createElement('div');
         row.className = 'location-row';
         row.style.cssText = "display: flex; flex-direction: column; gap: 4px; background: rgba(0,0,0,0.03); padding: 8px; border-radius: 4px; margin-bottom: 5px;";
         row.innerHTML = `
-            <div style="font-size: 0.8em; font-weight: bold; opacity: 0.8;">Lokacija #${index}</div>
-            <input type="text" class="loc-address" placeholder="Adresa lokacije">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-size: 0.8em; font-weight: bold; opacity: 0.8;">Lokacija #${index}</div>
+                <button type="button" onclick="this.parentElement.parentElement.remove()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:0.8em;">Ukloni</button>
+            </div>
+            <input type="text" class="loc-address" placeholder="Adresa lokacije" value="${address}">
             <div style="display: flex; gap: 5px;">
-                <input type="time" class="loc-time" style="width: 40%;">
-                <input type="text" class="loc-contact" style="width: 60%;" placeholder="Kontakt na lokaciji">
+                <input type="time" class="loc-time" style="width: 40%;" value="${time}">
+                <input type="text" class="loc-contact" style="width: 60%;" placeholder="Kontakt na lokaciji" value="${contact}">
             </div>
         `;
         container.appendChild(row);
-        setTimeout(() => row.getElementsByClassName('loc-address')[0].focus(), 100);
+    }
+
+    function saveTask() {
+        const date = document.getElementById('eventDate').value;
+        const editIndex = parseInt(document.getElementById('editTaskIndex').value);
+        const description = document.getElementById('taskDescription').value.trim();
+        const color = document.getElementById('eventColor').value;
+
+        if (currentSelectedWorkers.length === 0) return alert('Izaberite bar jednog člana tima!');
+
+        const locationRows = document.getElementsByClassName('location-row');
+        const locations = [];
+        for (let row of locationRows) {
+            const address = row.getElementsByClassName('loc-address')[0].value.trim();
+            const time = row.getElementsByClassName('loc-time')[0].value;
+            const contact = row.getElementsByClassName('loc-contact')[0].value.trim();
+            if (address) locations.push({ address, time, contact });
+        }
+
+        if (locations.length === 0) return alert('Unesite bar jednu lokaciju!');
+
+        const taskData = { workers: currentSelectedWorkers, locations, description, color };
+
+        if (!tasks[date]) tasks[date] = [];
+
+        if (editIndex > -1) {
+            tasks[date][editIndex] = taskData;
+        } else {
+            tasks[date].push(taskData);
+        }
+
+        db.ref('tasks').set(tasks);
+        closeModal('eventModal');
+    }
+
+    function editTask(date, index) {
+        closeModal('bookModal');
+        const task = tasks[date][index];
+        if (!task) return;
+
+        document.getElementById('eventModal').style.display = 'flex';
+        document.getElementById('eventDate').value = date;
+        document.getElementById('editTaskIndex').value = index;
+        
+        currentSelectedWorkers = task.workers ? [...task.workers] : [];
+        renderSelectedWorkers();
+
+        document.getElementById('taskDescription').value = task.description || '';
+        document.getElementById('eventColor').value = task.color || '#3b82f6';
+
+        const container = document.getElementById('locationsContainer');
+        container.innerHTML = '<label style="font-size: 0.85em; font-weight: bold;">Lokacije, vreme i kontakt:</label>';
+        
+        if (task.locations && task.locations.length > 0) {
+            task.locations.forEach(l => addLocationField(l.address, l.time, l.contact));
+        } else {
+            addLocationField();
+        }
+    }
+
+    function deleteTask(date, index) {
+        if (confirm('Da li ste sigurni da želite da obrišete ovo zaduženje?')) {
+            tasks[date].splice(index, 1);
+            if (tasks[date].length === 0) delete tasks[date];
+            db.ref('tasks').set(tasks);
+            closeModal('bookModal');
+        }
     }
 
     function openServiserModal() {
@@ -537,8 +675,13 @@
         const tbody = document.querySelector('#serviseriTable tbody');
         tbody.innerHTML = serviseri.length === 0 ? '<tr><td colspan="4" style="text-align:center;">Nema unetih serviserâ.</td></tr>' : '';
         serviseri.forEach((s, index) => {
-            const deleteBtn = userRole === 'admin' ? `<td><button class="secondary-btn" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteServiser(${index})">Obriši</button></td>` : '';
-            tbody.innerHTML += `<tr><td><strong>${s.name}</strong></td><td>${s.id}</td><td><img src="${s.qr}" style="width:40px;height:40px;"></td>${deleteBtn}</tr>`;
+            const deleteBtn = userRole === 'admin' ? `<td><button class="secondary-btn admin-only" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteServiser(${index})">Obriši</button></td>` : '';
+            tbody.innerHTML += `<tr>
+                <td><strong>${s.name}</strong></td>
+                <td class="admin-only">${s.id}</td>
+                <td class="admin-only"><img src="${s.qr}" style="width:40px;height:40px;"></td>
+                ${deleteBtn}
+            </tr>`;
         });
     }
 
@@ -560,7 +703,7 @@
         const tbody = document.querySelector('#vozilaTable tbody');
         tbody.innerHTML = vozila.length === 0 ? '<tr><td colspan="3" style="text-align:center;">Nema vozila.</td></tr>' : '';
         vozila.forEach((v, index) => {
-            const deleteBtn = userRole === 'admin' ? `<td><button class="secondary-btn" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteVozilo(${index})">Obriši</button></td>` : '';
+            const deleteBtn = userRole === 'admin' ? `<td><button class="secondary-btn admin-only" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteVozilo(${index})">Obriši</button></td>` : '';
             tbody.innerHTML += `<tr><td><strong>${v.model}</strong></td><td>${v.reg}</td>${deleteBtn}</tr>`;
         });
     }
@@ -592,117 +735,112 @@
             const statusStyle = istekla ? 'color:#ef4444;font-weight:bold;' : 'color:#22c55e;font-weight:bold;';
             const statusText = istekla ? 'ISTEKLO' : 'Aktivno';
             const actions = userRole === 'admin' ? `<td>
-                <button class="secondary-btn" style="background:#2563eb;padding:4px 8px;font-size:0.8em;" onclick="produziRegistraciju(${index})">Produži 1 god</button>
-                <button class="secondary-btn" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteRegistracija(${index})">Obriši</button>
+                <button class="secondary-btn admin-only" style="background:#2563eb;padding:4px 8px;font-size:0.8em;" onclick="produziRegistraciju(${index})">Produži</button>
+                <button class="secondary-btn admin-only" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteRegistracija(${index})">Obriši</button>
             </td>` : '';
             tbody.innerHTML += `<tr><td><strong>${r.voziloModel}</strong></td><td>${r.voziloReg}</td><td>${r.expiryDate}</td><td style="${statusStyle}">${statusText}</td>${actions}</tr>`;
         });
     }
 
     function produziRegistraciju(index) {
-        let r = registracije[index];
-        let d = new Date(r.expiryDate);
+        const d = new Date(registracije[index].expiryDate);
         d.setFullYear(d.getFullYear() + 1);
-        r.expiryDate = d.toISOString().split('T')[0];
+        registracije[index].expiryDate = d.toISOString().split('T')[0];
         db.ref('registracije').set(registracije);
     }
 
-    function deleteRegistracija(index) { if (confirm('Obrisati?')) { registracije.splice(index, 1); db.ref('registracije').set(registracije); } }
+    function deleteRegistracija(index) {
+        if(confirm('Obrisati evidenciju registracije?')) {
+            registracije.splice(index, 1);
+            db.ref('registracije').set(registracije);
+        }
+    }
 
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function openBookView(dateStr) {
+        currentBookDate = dateStr;
+        currentBookIndex = 0;
+        renderBookModal();
+    }
 
-    function saveTask() {
-        const date = document.getElementById('eventDate').value;
-        const color = document.getElementById('eventColor').value;
-        const checkboxes = document.querySelectorAll('.worker-checkbox:checked');
-        let selectedWorkers = [];
-        checkboxes.forEach(cb => {
-            const s = serviseri.find(item => item.id === cb.value);
-            if (s) selectedWorkers.push(s);
-        });
+    function openBookViewAt(dateStr, index) {
+        currentBookDate = dateStr;
+        currentBookIndex = index;
+        renderBookModal();
+    }
 
-        if (selectedWorkers.length === 0) return alert('Izaberite servisere!');
+    function changeBookCard(offset) {
+        const dayTasks = tasks[currentBookDate] || [];
+        currentBookIndex += offset;
+        if (currentBookIndex < 0) currentBookIndex = 0;
+        if (currentBookIndex >= dayTasks.length) currentBookIndex = dayTasks.length - 1;
+        renderBookModal();
+    }
 
-        const rows = document.getElementsByClassName('location-row');
-        let locations = [];
-        for (let row of rows) {
-            const address = row.getElementsByClassName('loc-address')[0].value.trim();
-            const time = row.getElementsByClassName('loc-time')[0].value;
-            const contact = row.getElementsByClassName('loc-contact')[0].value.trim();
-            if (address) locations.push({ address, time, contact });
+    function renderBookModal() {
+        const modal = document.getElementById('bookModal');
+        const body = document.getElementById('bookModalBody');
+        const title = document.getElementById('bookModalTitle');
+        const nav = document.getElementById('bookNavControls');
+        const counter = document.getElementById('bookCounter');
+
+        const dayTasks = tasks[currentBookDate] || [];
+        title.innerText = `Pregled zaduženja za dan: ${currentBookDate}`;
+
+        if (dayTasks.length === 0) {
+            body.innerHTML = '<p style="text-align:center; opacity:0.7;">Nema unetih zaduženja za ovaj dan.</p>';
+            nav.style.display = 'none';
+            modal.style.display = 'flex';
+            return;
         }
 
-        if (locations.length === 0) return alert('Uneti bar jednu lokaciju!');
-
-        if (!tasks[date]) tasks[date] = [];
-        tasks[date].push({ id: Date.now().toString(), workers: selectedWorkers, locations, color });
-        db.ref('tasks').set(tasks);
-        closeModal('eventModal');
-    }
-
-    function openBookView(dateString) { openBookViewAt(dateString, 0); }
-    function openBookViewAt(dateString, index) {
-        if (!tasks[dateString] || tasks[dateString].length === 0) return;
-        currentBookDate = dateString;
-        currentBookIndex = index;
-        document.getElementById('bookModal').style.display = 'flex';
-        renderBookCard();
-    }
-
-    function changeBookCard(direction) {
-        const dayTasks = tasks[currentBookDate];
-        if (!dayTasks) return;
-        currentBookIndex += direction;
-        if (currentBookIndex < 0) currentBookIndex = dayTasks.length - 1;
-        if (currentBookIndex >= dayTasks.length) currentBookIndex = 0;
-        renderBookCard();
-    }
-
-    function renderBookCard() {
-        const dayTasks = tasks[currentBookDate];
-        const body = document.getElementById('bookModalBody');
-        const counter = document.getElementById('bookCounter');
-        const navControls = document.getElementById('bookNavControls');
-
-        if (!dayTasks || dayTasks.length === 0) { closeModal('bookModal'); return; }
-
-        navControls.style.display = dayTasks.length > 1 ? 'flex' : 'none';
+        nav.style.display = 'flex';
+        if (currentBookIndex >= dayTasks.length) currentBookIndex = dayTasks.length - 1;
+        const task = dayTasks[currentBookIndex];
         counter.innerText = `${currentBookIndex + 1} / ${dayTasks.length}`;
 
-        const task = dayTasks[currentBookIndex];
-        let workersHtml = '';
-        if (task.workers) {
-            task.workers.forEach((w, idx) => {
-                workersHtml += `<div class="qr-badge" style="margin-bottom:6px;"><img src="${w.qr}"><div><h4>👤 S${idx + 1}: ${w.name}</h4><div style="font-size:0.85em;opacity:0.8;">ID: <strong>${w.id}</strong></div></div></div>`;
-            });
-        }
+        let workersHtml = task.workers ? task.workers.map(w => `<strong>${w.name}</strong>`).join(', ') : 'Nema unetih članova';
+        let descHtml = task.description ? `<div style="background:var(--bg-color); padding:8px; border-radius:6px; margin-top:5px;"><strong>Opis posla:</strong> ${task.description}</div>` : '';
 
         let locationsHtml = '';
         if (task.locations) {
-            task.locations.forEach((loc, idx) => {
-                locationsHtml += `<div style="background:rgba(0,0,0,0.03);padding:6px;border-radius:4px;margin-top:4px;"><div><strong>#${idx + 1} Adresa:</strong> ${loc.address}</div><div><strong>Vreme:</strong> ${loc.time || 'Nije fiksirano'}</div><div><strong>Kontakt:</strong> ${loc.contact || 'Nema kontakta'}</div></div>`;
+            task.locations.forEach((loc, lIdx) => {
+                locationsHtml += `
+                    <div class="task-detail-card">
+                        <div style="font-weight:bold; color:var(--btn-bg);">Lokacija #${lIdx + 1}</div>
+                        <div>📍 Adresa: <strong>${loc.address}</strong></div>
+                        <div>⏰ Vreme: <strong>${loc.time || 'Nije uneto'}</strong></div>
+                        <div>📞 Kontakt: <strong>${loc.contact || 'Nije uneto'}</strong></div>
+                    </div>
+                `;
             });
         }
 
-        const deleteBtn = userRole === 'admin' ? `<button class="secondary-btn" style="background-color:#ef4444;margin-top:10px;" onclick="deleteTask('${currentBookDate}', ${currentBookIndex})">Obriši ovo zaduženje</button>` : '';
+        let adminButtons = '';
+        if (userRole === 'admin') {
+            adminButtons = `
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button class="secondary-btn" style="background:#2563eb; flex:1;" onclick="editTask('${currentBookDate}', ${currentBookIndex})">Izmeni zaduženje</button>
+                    <button class="secondary-btn" style="background:#ef4444; flex:1;" onclick="deleteTask('${currentBookDate}', ${currentBookIndex})">Obriši zaduženje</button>
+                </div>
+            `;
+        }
 
         body.innerHTML = `
-            <div class="task-detail-card" style="border-left: 5px solid ${task.color};">
-                <div style="font-weight: bold; margin-bottom: 5px;">Članovi tima:</div>
-                ${workersHtml}
-                <div style="margin-top: 10px; font-weight: bold;">Raspored lokacija:</div>
-                <div style="max-height: 150px; overflow-y: auto;">${locationsHtml}</div>
-                ${deleteBtn}
-            </div>`;
+            <div style="font-size: 1.05em; font-weight: bold; border-bottom: 2px solid var(--border-color); padding-bottom: 5px;">
+                👥 Članovi tima: ${workersHtml}
+            </div>
+            ${descHtml}
+            <div style="display:flex; flex-direction:column; gap:8px; max-height:250px; overflow-y:auto;">
+                ${locationsHtml}
+            </div>
+            ${adminButtons}
+        `;
+
+        modal.style.display = 'flex';
     }
 
-    function deleteTask(dateString, index) {
-        if (userRole !== 'admin') return;
-        if (confirm('Obrisati zaduženje?')) {
-            tasks[dateString].splice(index, 1);
-            if (tasks[dateString].length === 0) delete tasks[dateString];
-            db.ref('tasks').set(tasks);
-        }
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
     }
 </script>
 </body>
