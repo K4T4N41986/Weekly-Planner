@@ -1,7 +1,7 @@
 {
-  "name": "Plan360 - Terenska Baza Podataka",
+  "name": "Plan360",
   "short_name": "Plan360",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#1e293b",
   "theme_color": "#1e293b",
