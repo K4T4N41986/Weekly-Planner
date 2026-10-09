@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Plan360</title>
+    <title>Plan360 - Terenska Baza Podataka</title>
     
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e293b">
+
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
@@ -239,7 +242,6 @@
                     <button type="button" class="secondary-btn" onclick="addTeamMember()">Dodaj</button>
                 </div>
                 <div id="selectedWorkersContainer" style="min-height: 45px; border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 6px; background: var(--bg-color);">
-                    <!-- Izabrani članovi tima -->
                 </div>
             </div>
 
