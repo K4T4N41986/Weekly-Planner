@@ -1,697 +1,709 @@
 <!DOCTYPE html>
-<html lang="sr" class="dark">
+<html lang="sr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planer</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1e293b">
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        darkBg: '#0f172a',
-                        cardBg: '#1e293b',
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- QR Code Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Plan360</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
+        :root {
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --card-bg: #fff;
+            --border-color: #cbd5e1;
+            --header-bg: #1e293b;
+            --header-text: #fff;
+            --btn-bg: #3b82f6;
+            --btn-hover: #2563eb;
+        }
+        [data-theme="dark"] {
+            --bg-color: #0f172a;
+            --text-color: #f1f5f9;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --header-bg: #020617;
+            --header-text: #fff;
+            --btn-bg: #6366f1;
+            --btn-hover: #4f46e5;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; height: 100dvh; overflow: hidden; transition: 0.3s; }
+        
+        /* Login Overlay */
+        #loginScreen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color); z-index: 2000;
+            display: flex; justify-content: center; align-items: center; padding: 20px;
+        }
+        .login-card {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            padding: 30px; border-radius: 12px; width: 100%; max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 15px;
+        }
+
+        /* Header */
+        header { background-color: var(--header-bg); color: var(--header-text); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px; }
+        .date-time { font-weight: bold; font-size: 0.95em; }
+        .nav-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+        .tab-btn { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 600; transition: 0.2s; }
+        .tab-btn:hover, .tab-btn.active { background: var(--btn-bg); border-color: var(--btn-bg); }
+        
+        .header-actions { display: flex; gap: 10px; align-items: center; }
+        .theme-toggle, .logout-btn { background: var(--btn-bg); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 600; }
+        .logout-btn { background-color: #ef4444; }
+
+        /* App Container */
+        #appContainer { display: none; flex-direction: column; height: 100dvh; overflow: hidden; }
+
+        /* Views */
+        .main-view { display: none; flex-grow: 1; overflow: auto; padding: 15px; }
+        .main-view.active-view { display: flex; flex-direction: column; }
+
+        .week-container { display: grid; grid-template-columns: repeat(7, 1fr); flex-grow: 1; overflow: auto; gap: 12px; }
+        @media (max-width: 1024px) { .week-container { grid-template-columns: 1fr; } }
+
+        .day-column { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; min-height: 250px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
+        .day-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-bottom: 10px; }
+        .day-title-info { cursor: pointer; flex-grow: 1; }
+        .day-title-info:hover { opacity: 0.8; }
+        .day-name { font-weight: bold; font-size: 1.05em; }
+        .day-date { font-size: 0.85em; opacity: 0.8; }
+        
+        .add-task-btn { background-color: var(--btn-bg); color: white; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 1.2em; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; transition: 0.2s; flex-shrink: 0; }
+        .add-task-btn:hover { transform: scale(1.1); background-color: var(--btn-hover); }
+
+        .events-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: calc(100vh - 220px); }
+        .event-card { padding: 10px; border-radius: 6px; font-size: 0.85em; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.4); box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: pointer; transition: transform 0.1s; }
+        .event-card:hover { transform: translateY(-2px); }
+
+        footer { background-color: var(--header-bg); padding: 10px 20px; display: flex; justify-content: space-between; flex-shrink: 0; }
+        .nav-btn { background-color: var(--btn-bg); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9em; }
+
+        /* Modals */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 1000; padding: 15px; }
+        .modal-content { background-color: var(--card-bg); padding: 20px; border-radius: 10px; width: 100%; max-width: 550px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); color: var(--text-color); font-size: 0.95em; }
+        .locations-container { display: flex; flex-direction: column; gap: 8px; border: 1px dashed var(--border-color); padding: 10px; border-radius: 6px; }
+        
+        .modal-actions { display: flex; justify-content: space-between; margin-top: 10px; gap: 10px; }
+        .save-btn { background-color: #22c55e; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; }
+        .cancel-btn { background-color: #ef4444; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; }
+        .secondary-btn { background-color: var(--btn-bg); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: bold; }
+
+        .admin-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
+        .admin-table th, .admin-table td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; }
+        .admin-table th { background-color: rgba(0,0,0,0.05); }
+
+        .book-modal-body { display: flex; flex-direction: column; gap: 15px; min-height: 250px; }
+        .book-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+        .task-detail-card { background: var(--bg-color); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; }
+        .qr-badge { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; }
+        .qr-badge img { width: 70px; height: 70px; background: white; padding: 3px; border-radius: 4px; }
+
+        /* Sakrivanje opcija za obične radnike */
+        .admin-only { display: none !important; }
+        body.is-admin .admin-only { display: flex !important; }
+        body.is-admin table .admin-only { display: table-cell !important; }
+        body.is-admin button.admin-only { display: inline-block !important; }
     </style>
 </head>
-<body class="bg-slate-100 dark:bg-darkBg text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-200">
+<body>
 
-    <!-- AUTHENTICATION SCREEN -->
-    <div id="auth-screen" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white dark:bg-cardBg rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200 dark:border-slate-700">
-            <div class="text-center mb-6">
-                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white text-2xl mb-3 shadow-lg shadow-blue-500/30">
-                    <i class="fa-solid fa-cube"></i>
-                </div>
-                <h2 id="auth-title" class="text-2xl font-bold">Prijava na sistem</h2>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Terenska Baza Podataka</p>
+    <!-- EKRAN ZA PRIJAVU -->
+    <div id="loginScreen">
+        <div class="login-card">
+            <h2 style="text-align: center; color: var(--btn-bg);">Plan360</h2>
+            <p style="text-align: center; font-size: 0.85em; opacity: 0.8;">Unesite pristupne podatke za prijavu</p>
+            <div>
+                <label style="font-size: 0.8em; font-weight: bold;">Email adresa:</label>
+                <input type="email" id="loginEmail" placeholder="ime@firma.com">
             </div>
-            
-            <form id="auth-form" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Email adresa</label>
-                    <input type="email" id="auth-email" required class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Lozinka</label>
-                    <input type="password" id="auth-password" required class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-                <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/30 transition-all">Prijavi se</button>
-            </form>
-            <div class="mt-4 text-center">
-                <button id="auth-switch-mode" onclick="toggleAuthMode()" class="text-sm text-blue-500 hover:underline">Nemate nalog? Registrujte se</button>
+            <div>
+                <label style="font-size: 0.8em; font-weight: bold;">Lozinka:</label>
+                <input type="password" id="loginPassword" placeholder="******">
+            </div>
+            <button class="save-btn" onclick="handleLogin()" style="width: 100%; padding: 12px;">Prijavi se</button>
+            <div id="loginError" style="color: #ef4444; font-size: 0.8em; text-align: center; display: none;"></div>
+        </div>
+    </div>
+
+    <!-- GLAVNI APARAT APLIKACIJE -->
+    <div id="appContainer">
+        <header>
+            <div class="date-time" id="clock">Datum i Vreme</div>
+            <div class="nav-tabs">
+                <button class="tab-btn active" onclick="switchView('planner')">RASPORED</button>
+                <button class="tab-btn" onclick="switchView('serviseri')">SERVISERI</button>
+                <button class="tab-btn" onclick="switchView('vozila')">VOZILA</button>
+                <button class="tab-btn" onclick="switchView('registracije')">REGISTRACIJE</button>
+            </div>
+            <div class="header-actions">
+                <span id="userBadge" style="font-size: 0.8em; opacity: 0.9; font-weight: bold;"></span>
+                <button class="theme-toggle" onclick="toggleTheme()">Tema</button>
+                <button class="logout-btn" onclick="handleLogout()">Prijava/Odjava</button>
+            </div>
+        </header>
+
+        <!-- PLANER VIEW -->
+        <div id="view-planner" class="main-view active-view">
+            <div class="week-container" id="weekContainer"></div>
+            <footer style="margin: -15px; margin-top: 15px;">
+                <button class="nav-btn" onclick="changeWeek(-1)">◀ Prethodna nedelja</button>
+                <button class="nav-btn" onclick="changeWeek(1)">Sledeća nedelja ▶</button>
+            </footer>
+        </div>
+
+        <!-- SERVISERI VIEW -->
+        <div id="view-serviseri" class="main-view">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Upravljanje Serviserima</h2>
+                <button class="secondary-btn admin-only" onclick="openServiserModal()">+ Dodaj novog servisera</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="admin-table" id="serviseriTable">
+                    <thead>
+                        <tr>
+                            <th>Ime i prezime</th>
+                            <th>Šestocifreni ID</th>
+                            <th>QR Kod</th>
+                            <th class="admin-only">Akcije</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VOZILA VIEW -->
+        <div id="view-vozila" class="main-view">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Spisak Vozila</h2>
+                <button class="secondary-btn admin-only" onclick="openVoziloModal()">+ Dodaj vozilo</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="admin-table" id="vozilaTable">
+                    <thead>
+                        <tr>
+                            <th>Marka i model</th>
+                            <th>Registraciona oznaka</th>
+                            <th class="admin-only">Akcije</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- REGISTRACIJE VIEW -->
+        <div id="view-registracije" class="main-view">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Datum Registracije Vozila</h2>
+                <button class="secondary-btn admin-only" onclick="openRegistracijaModal()">+ Unesi registraciju</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="admin-table" id="registracijeTable">
+                    <thead>
+                        <tr>
+                            <th>Vozilo (Marka i Model)</th>
+                            <th>Registracija</th>
+                            <th>Datum isteka</th>
+                            <th>Status</th>
+                            <th class="admin-only">Akcije</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <!-- HEADER -->
-    <header class="bg-white dark:bg-cardBg border-b border-slate-200 dark:border-slate-700 sticky top-0 z-40 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
-                    <i class="fa-solid fa-cube text-lg"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg leading-tight">Terenska Baza</h1>
-                    <span id="user-role-badge" class="text-xs px-2 py-0.5 rounded-full font-medium inline-block mt-0.5">Učitavanje...</span>
-                </div>
+    <!-- MODALI ZA UNOS -->
+    <div class="modal" id="eventModal">
+        <div class="modal-content">
+            <h3>Unos zaduženja za dan</h3>
+            <input type="hidden" id="eventDate">
+            <div>
+                <label style="font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 5px;">Izaberite članove tima:</label>
+                <div id="workersCheckboxContainer" style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 5px; background: var(--bg-color);"></div>
             </div>
-            
-            <div class="flex items-center space-x-2">
-                <button onclick="toggleTheme()" class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
-                    <i id="theme-icon" class="fa-solid fa-moon"></i>
-                </button>
-                <button id="logout-btn" onclick="logoutUser()" class="hidden px-3 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition text-sm font-medium flex items-center space-x-1.5">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
-                    <span class="hidden sm:inline">Odjava</span>
-                </button>
+            <div class="locations-container" id="locationsContainer">
+                <label style="font-size: 0.85em; font-weight: bold;">Lokacije, vreme i kontakt:</label>
             </div>
-        </div>
-    </header>
-
-    <!-- NAVIGATION TABS -->
-    <nav class="bg-white dark:bg-cardBg border-b border-slate-200 dark:border-slate-700 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 flex space-x-4 overflow-x-auto">
-            <button onclick="switchTab('planner')" id="tab-planner" class="tab-btn py-3 px-4 border-b-2 border-blue-600 font-semibold text-blue-600 dark:text-blue-400 flex items-center space-x-2 whitespace-nowrap">
-                <i class="fa-solid fa-calendar-days"></i>
-                <span>Planer Zaduženja</span>
-            </button>
-            <button onclick="switchTab('serviseri')" id="tab-serviseri" class="tab-btn py-3 px-4 border-b-2 border-transparent font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
-                <i class="fa-solid fa-users-gear"></i>
-                <span>Serviseri (Admin)</span>
-            </button>
-        </div>
-    </nav>
-
-    <!-- MAIN CONTAINER -->
-    <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
-
-        <!-- PLANER TAB -->
-        <section id="content-planner" class="space-y-6">
-            <!-- Controls / Add Task Bar (Admin Only) -->
-            <div id="admin-controls" class="hidden bg-white dark:bg-cardBg p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-4">
-                <div class="flex items-center space-x-2">
-                    <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Izaberi datum:</span>
-                    <input type="date" id="selected-date-picker" onchange="changeSelectedDate(this.value)" class="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm font-medium">
-                </div>
-                <button onclick="openTaskModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm shadow-md shadow-blue-500/20 flex items-center space-x-2">
-                    <i class="fa-solid fa-plus"></i>
-                    <span>Novo Zaduženje</span>
-                </button>
+            <button type="button" class="secondary-btn" onclick="addLocationField()">+ Dodaj još jednu lokaciju</button>
+            <div>
+                <label style="font-size: 0.85em; opacity: 0.8;">Boja kartice:</label>
+                <select id="eventColor">
+                    <option value="#3b82f6">Plava (Standardno)</option>
+                    <option value="#ef4444">Crvena (Visok prioritet)</option>
+                    <option value="#eab308">Žuta (Hitno / Važno)</option>
+                    <option value="#22c55e">Zelena (Redovan zadatak)</option>
+                    <option value="#a855f7">Ljubičasta (Specijalno)</option>
+                    <option value="#f97316">Narandžasta (Terenski rad)</option>
+                </select>
             </div>
-
-            <!-- Date Header (Datum pored dana) -->
-            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-2xl shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <div class="flex items-baseline space-x-3">
-                        <h2 id="current-day-name" class="text-2xl font-bold tracking-tight">Ponedeljak</h2>
-                        <span id="current-day-date" class="text-lg font-medium opacity-90">09.10.2026.</span>
-                    </div>
-                    <p class="text-sm opacity-80 mt-1">Pregled terenskih zaduženja za izabrani dan</p>
-                </div>
-                <div class="flex items-center space-x-2 bg-white/10 p-1.5 rounded-xl backdrop-blur-md self-start md:self-auto">
-                    <button onclick="changeDayOffset(-1)" class="px-3 py-1.5 rounded-lg hover:bg-white/20 transition text-sm font-medium"><i class="fa-solid fa-chevron-left"></i></button>
-                    <button onclick="resetToToday()" class="px-3 py-1.5 rounded-lg hover:bg-white/20 transition text-sm font-semibold">Danas</button>
-                    <button onclick="changeDayOffset(1)" class="px-3 py-1.5 rounded-lg hover:bg-white/20 transition text-sm font-medium"><i class="fa-solid fa-chevron-right"></i></button>
-                </div>
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeModal('eventModal')">Odustani</button>
+                <button class="save-btn" onclick="saveTask()">Sačuvaj zaduženje</button>
             </div>
-
-            <!-- Tasks Container -->
-            <div id="tasks-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <!-- Dinamički uneti zadaci -->
-            </div>
-        </section>
-
-        <!-- SERVISERI TAB (ADMIN ONLY) -->
-        <section id="content-serviseri" class="space-y-6 hidden">
-            <div class="bg-white dark:bg-cardBg p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
-                    <div>
-                        <h2 class="text-xl font-bold">Upravljanje serviserima</h2>
-                        <p class="text-sm text-slate-500 dark:text-slate-400">Administracija zaposlenih, unikatnih ID-ijeva i QR kodova</p>
-                    </div>
-                    <button onclick="openServiserModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-sm shadow-md shadow-emerald-500/20 flex items-center space-x-2">
-                        <i class="fa-solid fa-user-plus"></i>
-                        <span>Dodaj Servisera</span>
-                    </button>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="border-b border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                                <th class="py-3 px-4">Ime i prezime</th>
-                                <th class="py-3 px-4">ID Servisera</th>
-                                <th class="py-3 px-4">QR Kod</th>
-                                <th class="py-3 px-4 text-right">Akcije</th>
-                            </tr>
-                        </thead>
-                        <tbody id="serviseri-table-body" class="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
-                            <!-- Dinamički serviseri -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- MODAL ZA KREIRANJE/IZMENU ZADUŽENJA -->
-    <div id="task-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white dark:bg-cardBg rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between mb-4">
-                <h3 id="task-modal-title" class="text-lg font-bold">Novo terensko zaduženje</h3>
-                <button onclick="closeTaskModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            
-            <form id="task-form" onsubmit="saveTask(event)" class="space-y-4">
-                <input type="hidden" id="task-edit-id">
-                
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Datum zaduženja</label>
-                    <input type="date" id="modal-task-date" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Prioritet</label>
-                    <select id="modal-task-priority" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm">
-                        <option value="normal">Normalan prioritet</option>
-                        <option value="medium">Srednji prioritet (Žuto)</option>
-                        <option value="high">Visok prioritet (Crveno)</option>
-                    </select>
-                </div>
-
-                <!-- Članovi tima sa autofill / dropdown izborom -->
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Članovi tima</label>
-                    <div class="flex space-x-2 mb-2">
-                        <select id="modal-serviser-select" class="flex-1 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm">
-                            <!-- Popunjava se JS-om -->
-                        </select>
-                        <button type="button" onclick="addTeamMember()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-sm font-medium">Dodaj</button>
-                    </div>
-                    <div id="modal-selected-team" class="flex flex-wrap gap-2 min-h-[40px] p-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <!-- Izabrani članovi tima sa dugmetom za brisanje -->
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Opis posla</label>
-                    <textarea id="modal-task-desc" rows="3" placeholder="Unesite detaljan opis posla za taj dan..." class="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm"></textarea>
-                </div>
-
-                <div class="flex justify-end space-x-3 pt-2">
-                    <button type="button" onclick="closeTaskModal()" class="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800">Otkaži</button>
-                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-500/20">Sačuvaj</button>
-                </div>
-            </form>
         </div>
     </div>
 
-    <!-- MODAL ZA DODAVANJE SERVISERA (ADMIN) -->
-    <div id="serviser-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white dark:bg-cardBg rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200 dark:border-slate-700">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold">Novi serviser</h3>
-                <button onclick="closeServiserModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><i class="fa-solid fa-xmark text-lg"></i></button>
+    <div class="modal" id="serviserModal">
+        <div class="modal-content">
+            <h3>Unos novog servisera</h3>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Ime i prezime:</label><input type="text" id="newServiserName" placeholder="npr. Petar Petrović"></div>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Šestocifreni ID:</label><input type="text" id="newServiserId" placeholder="npr. 123456" maxlength="6"></div>
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeModal('serviserModal')">Odustani</button>
+                <button class="save-btn" onclick="saveServiser()">Sačuvaj servisera</button>
             </div>
-            
-            <form id="serviser-form" onsubmit="saveServiser(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Ime i prezime</label>
-                    <input type="text" id="serviser-name" required placeholder="npr. Petar Petrović" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">ID Servisera</label>
-                    <input type="text" id="serviser-id" required placeholder="npr. SRV-001" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm">
-                </div>
-                <div class="flex justify-end space-x-3 pt-2">
-                    <button type="button" onclick="closeServiserModal()" class="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800">Otkaži</button>
-                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-emerald-500/20">Sačuvaj</button>
-                </div>
-            </form>
         </div>
     </div>
 
-    <!-- MODAL ZA PREGLED QR KODA (ADMIN) -->
-    <div id="qr-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white dark:bg-cardBg rounded-2xl shadow-2xl w-full max-w-xs p-6 border border-slate-200 dark:border-slate-700 text-center">
-            <h3 id="qr-modal-title" class="text-base font-bold mb-4">QR Kod Servisera</h3>
-            <div id="qrcode-container" class="bg-white p-4 rounded-xl inline-block shadow-inner mb-4 flex justify-center"></div>
-            <button onclick="closeQrModal()" class="w-full py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-sm font-medium">Zatvori</button>
+    <div class="modal" id="voziloModal">
+        <div class="modal-content">
+            <h3>Unos novog vozila</h3>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Marka i model:</label><input type="text" id="newVoziloModel" placeholder="npr. Fiat Doblò"></div>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Registraciona oznaka:</label><input type="text" id="newVoziloReg" placeholder="npr. BG1234AJ"></div>
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeModal('voziloModal')">Odustani</button>
+                <button class="save-btn" onclick="saveVozilo()">Sačuvaj vozilo</button>
+            </div>
         </div>
     </div>
 
-    <!-- FIREBASE SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getDatabase, ref, set, get, update, remove, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    <div class="modal" id="registracijaModal">
+        <div class="modal-content">
+            <h3>Evidencija registracije vozila</h3>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Izaberi vozilo:</label><select id="regVoziloSelect"></select></div>
+            <div><label style="font-size: 0.85em; opacity: 0.8;">Datum isteka registracije:</label><input type="date" id="newRegDate"></div>
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeModal('registracijaModal')">Odustani</button>
+                <button class="save-btn" onclick="saveRegistracija()">Sačuvaj registraciju</button>
+            </div>
+        </div>
+    </div>
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyDummyKeyForLocalOrPwaMock-ChangeIfNeeded",
-            authDomain: "planer-22ce9.firebaseapp.com",
-            databaseURL: "https://planer-22ce9-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "planer-22ce9",
-            storageBucket: "planer-22ce9.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abcdef"
-        };
+    <div class="modal" id="bookModal">
+        <div class="modal-content">
+            <h3 id="bookModalTitle">Pregled zaduženja za dan</h3>
+            <div class="book-modal-body" id="bookModalBody"></div>
+            <div class="book-nav" id="bookNavControls">
+                <button class="secondary-btn" onclick="changeBookCard(-1)">◀ Prethodna ekipa</button>
+                <span id="bookCounter" style="font-weight: bold; font-size: 0.9em;">1 / 1</span>
+                <button class="secondary-btn" onclick="changeBookCard(1)">Sledeća ekipa ▶</button>
+            </div>
+            <div class="modal-actions">
+                <button class="cancel-btn" style="width: 100%;" onclick="closeModal('bookModal')">Zatvori pregled</button>
+            </div>
+        </div>
+    </div>
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getDatabase(app);
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyC4LnY6l1cjzHrwxiYhQc-0LoVwhk7IjVM",
+      authDomain: "planer-22ce9.firebaseapp.com",
+      databaseURL: "https://planer-22ce9-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "planer-22ce9",
+      storageBucket: "planer-22ce9.firebasestorage.app",
+      messagingSenderId: "640110002382",
+      appId: "1:640110002382:web:adb54803d437bb827c509f"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const auth = firebase.auth();
 
-        // Global State
-        window.currentUserRole = 'serviser';
-        window.currentDate = new Date().toISOString().split('T')[0];
-        window.currentTeamList = [];
-        window.allServiseriData = {};
+    let currentUser = null;
+    let userRole = 'serviser'; // podrazumevano
+    let currentDate = new Date();
+    let tasks = {}, serviseri = [], vozila = [], registracije = [];
+    let currentBookDate = '', currentBookIndex = 0;
+    const daysInWeek = ['Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja'];
 
-        // Theme management (Dark by default, robust toggle)
-        window.toggleTheme = function() {
-            const html = document.documentElement;
-            const icon = document.getElementById('theme-icon');
-            if (html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                icon.className = "fa-solid fa-sun";
-                localStorage.setItem('theme', 'light');
-            } else {
-                html.classList.add('dark');
-                icon.className = "fa-solid fa-moon";
-                localStorage.setItem('theme', 'dark');
-            }
-        };
-
-        // Init theme state
-        if (localStorage.getItem('theme') === 'light') {
-            document.documentElement.classList.remove('dark');
-            document.getElementById('theme-icon').className = "fa-solid fa-sun";
-        } else {
-            document.documentElement.classList.add('dark');
-            document.getElementById('theme-icon').className = "fa-solid fa-moon";
-        }
-
-        // Tabs
-        window.switchTab = function(tabName) {
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('border-blue-600', 'text-blue-600', 'dark:text-blue-400', 'font-semibold');
-                btn.classList.add('border-transparent', 'font-medium', 'text-slate-500', 'dark:text-slate-400');
-            });
-            document.getElementById(`tab-${tabName}`).classList.add('border-blue-600', 'text-blue-600', 'dark:text-blue-400', 'font-semibold');
-            document.getElementById(`tab-${tabName}`).classList.remove('border-transparent', 'font-medium', 'text-slate-500', 'dark:text-slate-400');
-
-            if (tabName === 'planner') {
-                document.getElementById('content-planner').classList.remove('hidden');
-                document.getElementById('content-serviseri').classList.add('hidden');
-            } else {
-                document.getElementById('content-planner').classList.add('hidden');
-                document.getElementById('content-serviseri').classList.remove('hidden');
-            }
-        };
-
-        // Auth State Observer
-        onAuthStateChanged(auth, (user) => {
-            const authScreen = document.getElementById('auth-screen');
-            const logoutBtn = document.getElementById('logout-btn');
-            const roleBadge = document.getElementById('user-role-badge');
-            const adminControls = document.getElementById('admin-controls');
-            const tabServiseri = document.getElementById('tab-serviseri');
-
-            if (user) {
-                authScreen.classList.add('hidden');
-                logoutBtn.classList.remove('hidden');
-
-                // Check Role in DB
-                const userRef = ref(db, 'users/' + user.uid);
-                get(userRef).then((snapshot) => {
-                    let role = 'serviser';
-                    if (snapshot.exists() && snapshot.val().role) {
-                        role = snapshot.val().role;
-                    } else {
-                        // Auto-assign default if missing
-                        set(userRef, { email: user.email, role: 'serviser' });
-                    }
-                    window.currentUserRole = role;
-                    if (role === 'admin') {
-                        roleBadge.innerText = 'ADMIN';
-                        roleBadge.className = 'text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-500 inline-block mt-0.5';
-                        adminControls.classList.remove('hidden');
-                        tabServiseri.classList.remove('hidden');
-                    } else {
-                        roleBadge.innerText = 'SERVISER';
-                        roleBadge.className = 'text-xs px-2.5 py-0.5 rounded-full font-bold bg-blue-500/20 text-blue-500 inline-block mt-0.5';
-                        adminControls.classList.add('hidden');
-                        tabServiseri.classList.add('hidden');
-                    }
-                });
-
-                initRealtimeListeners();
-            } else {
-                authScreen.classList.remove('hidden');
-                logoutBtn.classList.add('hidden');
-                roleBadge.innerText = 'Neprijavljen';
-                roleBadge.className = 'text-xs px-2.5 py-0.5 rounded-full font-medium bg-slate-500/20 text-slate-400 inline-block mt-0.5';
-                adminControls.classList.add('hidden');
-                tabServiseri.classList.add('hidden');
-            }
-        });
-
-        // Auth actions
-        let isRegistering = false;
-        window.toggleAuthMode = function() {
-            isRegistering = !isRegistering;
-            document.getElementById('auth-title').innerText = isRegistering ? 'Registracija naloga' : 'Prijava na sistem';
-            document.getElementById('auth-switch-mode').innerText = isRegistering ? 'Već imate nalog? Prijavite se' : 'Nemate nalog? Registrujte se';
-        };
-
-        document.getElementById('auth-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('auth-email').value;
-            const password = document.getElementById('auth-password').value;
-
-            if (isRegistering) {
-                createUserWithEmailAndPassword(auth, email, password).then((cred) => {
-                    set(ref(db, 'users/' + cred.user.uid), { email: email, role: 'serviser' });
-                }).catch(err => alert('Greška: ' + err.message));
-            } else {
-                signInWithEmailAndPassword(auth, email, password).catch(err => alert('Greška: ' + err.message));
-            }
-        });
-
-        window.logoutUser = function() {
-            signOut(auth);
-        };
-
-        // Date Handling
-        window.changeSelectedDate = function(dateStr) {
-            window.currentDate = dateStr;
-            updateDateHeader();
-            fetchTasksForDate();
-        };
-
-        window.changeDayOffset = function(days) {
-            let d = new Date(window.currentDate);
-            d.setDate(d.getDate() + days);
-            window.currentDate = d.toISOString().split('T')[0];
-            document.getElementById('selected-date-picker').value = window.currentDate;
-            updateDateHeader();
-            fetchTasksForDate();
-        };
-
-        window.resetToToday = function() {
-            window.currentDate = new Date().toISOString().split('T')[0];
-            document.getElementById('selected-date-picker').value = window.currentDate;
-            updateDateHeader();
-            fetchTasksForDate();
-        };
-
-        function updateDateHeader() {
-            const [year, month, day] = window.currentDate.split('-');
-            const dObj = new Date(year, month - 1, day);
-            const options = { weekday: 'long' };
-            let dayName = dObj.toLocaleDateString('sr-RS', options);
-            dayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
-
-            document.getElementById('current-day-name').innerText = dayName;
-            document.getElementById('current-day-date').innerText = `${day}.${month}.${year}.`;
-        }
-
-        // Init date picker value
-        document.getElementById('selected-date-picker').value = window.currentDate;
-        updateDateHeader();
-
-        // Realtime Listeners & Data Sync
-        function initRealtimeListeners() {
-            // Serviseri listener
-            onValue(ref(db, 'serviseri'), (snapshot) => {
-                const tbody = document.getElementById('serviseri-table-body');
-                const select = document.getElementById('modal-serviser-select');
-                tbody.innerHTML = '';
-                select.innerHTML = '<option value="">Izaberi servisera...</option>';
-                window.allServiseriData = {};
-
-                if (snapshot.exists()) {
-                    snapshot.forEach((childSnap) => {
-                        const sId = childSnap.key;
-                        const sData = childSnap.val();
-                        window.allServiseriData[sId] = sData;
-
-                        // Add to select dropdown
-                        const opt = document.createElement('option');
-                        opt.value = sData.name;
-                        opt.textContent = sData.name;
-                        select.appendChild(opt);
-
-                        // Add to admin table
-                        if (window.currentUserRole === 'admin') {
-                            const tr = document.createElement('tr');
-                            tr.className = 'border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50';
-                            tr.innerHTML = `
-                                <td class="py-3 px-4 font-medium">${sData.name}</td>
-                                <td class="py-3 px-4 text-slate-500 dark:text-slate-400">${sData.serviserId || '-'}</td>
-                                <td class="py-3 px-4">
-                                    <button onclick="showQrModal('${sData.name}', '${sData.serviserId || sData.name}')" class="px-2.5 py-1 bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg text-xs font-medium transition">Prikaži QR</button>
-                                </td>
-                                <td class="py-3 px-4 text-right">
-                                    <button onclick="deleteServiser('${sId}')" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash"></i></button>
-                                </td>
-                            `;
-                            tbody.appendChild(tr);
-                        }
-                    });
-                }
-            });
-
-            fetchTasksForDate();
-        }
-
-        function fetchTasksForDate() {
-            const container = document.getElementById('tasks-container');
-            container.innerHTML = '<div class="col-span-full text-center py-8 text-slate-400">Učitavanje zaduženja...</div>';
-
-            onValue(ref(db, 'tasks/' + window.currentDate), (snapshot) => {
-                container.innerHTML = '';
-                if (!snapshot.exists()) {
-                    container.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400 bg-white dark:bg-cardBg rounded-2xl border border-slate-200 dark:border-slate-700"><i class="fa-solid fa-calendar-xmark text-3xl mb-2 opacity-50"></i><p>Nema unetih zaduženja za ovaj dan.</p></div>';
-                    return;
-                }
-
-                snapshot.forEach((childSnap) => {
-                    const tId = childSnap.key;
-                    const tData = childSnap.val();
-
-                    // Prioritet boje kartice
-                    let priorityBorder = 'border-slate-200 dark:border-slate-700';
-                    let priorityBadge = '';
-                    if (tData.priority === 'high') {
-                        priorityBorder = 'border-rose-500 shadow-rose-500/10';
-                        priorityBadge = '<span class="px-2 py-0.5 bg-rose-500/10 text-rose-500 text-xs font-bold rounded-full">Visok prioritet</span>';
-                    } else if (tData.priority === 'medium') {
-                        priorityBorder = 'border-amber-500 shadow-amber-500/10';
-                        priorityBadge = '<span class="px-2 py-0.5 bg-amber-500/10 text-amber-500 text-xs font-bold rounded-full">Srednji prioritet</span>';
-                    }
-
-                    let teamHtml = '';
-                    if (tData.team && Array.isArray(tData.team)) {
-                        teamHtml = tData.team.map(member => `<span class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-medium">${member}</span>`).join('');
-                    }
-
-                    const card = document.createElement('div');
-                    card.className = `bg-white dark:bg-cardBg rounded-2xl p-5 border ${priorityBorder} shadow-sm flex flex-col justify-between`;
-                    card.innerHTML = `
-                        <div>
-                            <div class="flex items-center justify-between mb-3">
-                                ${priorityBadge}
-                                ${window.currentUserRole === 'admin' ? `
-                                    <div class="flex space-x-2">
-                                        <button onclick="editTask('${tId}', '${tData.priority \vert{}\vert{} 'normal'}', '${encodeURIComponent(tData.description || '')}')" class="text-slate-400 hover:text-blue-500"><i class="fa-solid fa-pen"></i></button>
-                                        <button onclick="deleteTask('${tId}')" class="text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash"></i></button>
-                                    </div>
-                                ` : ''}
-                            </div>
-                            <div class="mb-4">
-                                <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Članovi tima:</h4>
-                                <div class="flex flex-wrap gap-1.5">${teamHtml}</div>
-                            </div>
-                            <div>
-                                <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Opis posla:</h4>
-                                <p class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">${tData.description || 'Nema opisa.'}</p>
-                            </div>
-                        </div>
-                    `;
-                    container.appendChild(card);
-                });
-            }, { onlyOnce: true });
-        }
-
-        // Task Modal & Team management inside task
-        window.openTaskModal = function() {
-            document.getElementById('task-edit-id').value = '';
-            document.getElementById('modal-task-date').value = window.currentDate;
-            document.getElementById('modal-task-priority').value = 'normal';
-            document.getElementById('modal-task-desc').value = '';
-            window.currentTeamList = [];
-            renderSelectedTeam();
-            document.getElementById('task-modal').classList.remove('hidden');
-        };
-
-        window.closeTaskModal = function() {
-            document.getElementById('task-modal').classList.add('hidden');
-        };
-
-        window.addTeamMember = function() {
-            const select = document.getElementById('modal-serviser-select');
-            const name = select.value;
-            if (!name) return;
-            if (!window.currentTeamList.includes(name)) {
-                window.currentTeamList.push(name);
-                renderSelectedTeam();
-            }
-            select.value = '';
-        };
-
-        window.removeTeamMember = function(index) {
-            window.currentTeamList.splice(index, 1);
-            renderSelectedTeam();
-        };
-
-        function renderSelectedTeam() {
-            const container = document.getElementById('modal-selected-team');
-            container.innerHTML = '';
-            if (window.currentTeamList.length === 0) {
-                container.innerHTML = '<span class="text-xs text-slate-400 italic">Nema izabranih članova tima.</span>';
-                return;
-            }
-            window.currentTeamList.forEach((member, index) => {
-                const tag = document.createElement('div');
-                tag.className = 'flex items-center space-x-1.5 bg-blue-500/10 text-blue-500 dark:text-blue-400 px-3 py-1 rounded-xl text-xs font-medium';
-                tag.innerHTML = `
-                    <span>${member}</span>
-                    <button type="button" onclick="removeTeamMember(${index})" class="hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
-                `;
-                container.appendChild(tag);
-            });
-        }
-
-        window.saveTask = function(e) {
-            e.preventDefault();
-            const date = document.getElementById('modal-task-date').value;
-            const priority = document.getElementById('modal-task-priority').value;
-            const description = document.getElementById('modal-task-desc').value;
-            const editId = document.getElementById('task-edit-id').value;
-
-            if (window.currentTeamList.length === 0) {
-                alert('Morate izabrati bar jednog člana tima.');
-                return;
-            }
-
-            const taskData = {
-                team: window.currentTeamList,
-                priority: priority,
-                description: description,
-                date: date
-            };
-
-            const tasksRef = ref(db, 'tasks/' + date);
-            if (editId) {
-                set(ref(db, `tasks/${date}/${editId}`), taskData).then(() => {
-                    closeTaskModal();
-                    fetchTasksForDate();
-                });
-            } else {
-                const newRef = push(tasksRef);
-                set(newRef, taskData).then(() => {
-                    closeTaskModal();
-                    fetchTasksForDate();
-                });
-            }
-        };
-
-        window.deleteTask = function(tId) {
-            if (confirm('Da li ste sigurni da želite da obrišete ovo zaduženje?')) {
-                remove(ref(db, `tasks/${window.currentDate}/${tId}`)).then(() => fetchTasksForDate());
-            }
-        };
-
-        window.editTask = function(tId, priority, descEncoded) {
-            document.getElementById('task-edit-id').value = tId;
-            document.getElementById('modal-task-priority').value = priority;
-            document.getElementById('modal-task-desc').value = decodeURIComponent(descEncoded);
+    // Provera statusa prijave
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = user;
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'flex';
             
-            // Load team for this task
-            get(ref(db, `tasks/${window.currentDate}/${tId}/team`)).then((snapshot) => {
-                if (snapshot.exists()) {
-                    window.currentTeamList = snapshot.val();
-                    renderSelectedTeam();
+            // Proveri ulogu u bazi
+            db.ref('users/' + user.uid).once('value').then(snapshot => {
+                const userData = snapshot.val();
+                if (userData && userData.role) {
+                    userRole = userData.role;
                 } else {
-                    window.currentTeamList = [];
-                    renderSelectedTeam();
+                    // Ako je admin email, postavi ga automatski kao admin
+                    if (user.email.includes('admin')) {
+                        userRole = 'admin';
+                        db.ref('users/' + user.uid).set({ email: user.email, role: 'admin' });
+                    } else {
+                        userRole = 'serviser';
+                        db.ref('users/' + user.uid).set({ email: user.email, role: 'serviser' });
+                    }
                 }
-                document.getElementById('task-modal').classList.remove('hidden');
+                applyRolePermissions();
             });
-        };
 
-        // Serviser Modal (Admin)
-        window.openServiserModal = function() {
-            document.getElementById('serviser-name').value = '';
-            document.getElementById('serviser-id').value = 'SRV-' + Math.floor(100 + Math.random() * 900);
-            document.getElementById('serviser-modal').classList.remove('hidden');
-        };
+            initApp();
+        } else {
+            currentUser = null;
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('appContainer').style.display = 'none';
+        }
+    });
 
-        window.closeServiserModal = function() {
-            document.getElementById('serviser-modal').classList.add('hidden');
-        };
+    function handleLogin() {
+        const email = document.getElementById('loginEmail').value.trim();
+        const pass = document.getElementById('loginPassword').value.trim();
+        const errDiv = document.getElementById('loginError');
 
-        window.saveServiser = function(e) {
-            e.preventDefault();
-            const name = document.getElementById('serviser-name').value;
-            const sId = document.getElementById('serviser-id').value;
+        if (!email || !pass) { errDiv.innerText = 'Unesite email i lozinku!'; errDiv.style.display = 'block'; return; }
 
-            const newRef = push(ref(db, 'serviseri'));
-            set(newRef, { name: name, serviserId: sId }).then(() => {
-                closeServiserModal();
+        auth.signInWithEmailAndPassword(email, pass).catch(err => {
+            errDiv.innerText = 'Greška pri prijavi: ' + err.message;
+            errDiv.style.display = 'block';
+        });
+    }
+
+    function handleLogout() {
+        auth.signOut();
+    }
+
+    function applyRolePermissions() {
+        if (userRole === 'admin') {
+            document.body.classList.add('is-admin');
+            document.getElementById('userBadge').innerText = '👑 ADMIN (' + currentUser.email + ')';
+        } else {
+            document.body.classList.remove('is-admin');
+            document.getElementById('userBadge').innerText = '👤 SERVISER (' + currentUser.email + ')';
+        }
+        renderWeek();
+        renderServiseriTable();
+        renderVozilaTable();
+        renderRegistracijeTable();
+    }
+
+    function initApp() {
+        if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        db.ref('tasks').on('value', snapshot => { tasks = snapshot.val() || {}; renderWeek(); });
+        db.ref('serviseri').on('value', snapshot => { serviseri = snapshot.val() || []; renderServiseriTable(); });
+        db.ref('vozila').on('value', snapshot => { vozila = snapshot.val() || []; renderVozilaTable(); });
+        db.ref('registracije').on('value', snapshot => { registracije = snapshot.val() || []; renderRegistracijeTable(); });
+    }
+
+    function toggleTheme() {
+        const isDark = document.body.getAttribute('data-theme') === 'dark';
+        document.body.toggleAttribute('data-theme', !isDark);
+        localStorage.setItem('theme', isDark ? 'light' : 'dark');
+    }
+
+    function updateClock() {
+        const now = new Date();
+        const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+        document.getElementById('clock').innerText = now.toLocaleDateString('sr-RS', options);
+    }
+
+    function switchView(viewName) {
+        document.querySelectorAll('.main-view').forEach(v => v.classList.remove('active-view'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('view-' + viewName).classList.add('active-view');
+        event.target.classList.add('active');
+    }
+
+    function getStartOfWeek(date) {
+        const d = new Date(date);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
+        return new Date(d.setDate(diff));
+    }
+
+    function changeWeek(offset) {
+        currentDate.setDate(currentDate.getDate() + (offset * 7));
+        renderWeek();
+    }
+
+    function renderWeek() {
+        const container = document.getElementById('weekContainer');
+        container.innerHTML = '';
+        const startOfWeek = getStartOfWeek(currentDate);
+
+        for (let i = 0; i < 7; i++) {
+            const currentDay = new Date(startOfWeek);
+            currentDay.setDate(startOfWeek.getDate() + i);
+            const dateString = currentDay.toISOString().split('T')[0];
+
+            const col = document.createElement('div');
+            col.className = 'day-column';
+            const displayDate = currentDay.toLocaleDateString('sr-RS', {day: 'numeric', month: 'numeric'});
+            
+            const addBtnHtml = userRole === 'admin' ? `<button class="add-task-btn" onclick="openAddModal('${dateString}')">+</button>` : '';
+
+            col.innerHTML = `
+                <div class="day-header">
+                    <div class="day-title-info" onclick="openBookView('${dateString}')">
+                        <div class="day-name">${daysInWeek[i]}</div>
+                        <div class="day-date">${displayDate}</div>
+                    </div>
+                    ${addBtnHtml}
+                </div>
+                <div class="events-list" id="tasks-${dateString}"></div>
+            `;
+            container.appendChild(col);
+            renderTasksForDay(dateString);
+        }
+    }
+
+    function renderTasksForDay(dateString) {
+        const list = document.getElementById(`tasks-${dateString}`);
+        if (!list) return;
+        list.innerHTML = '';
+
+        if (tasks[dateString] && tasks[dateString].length > 0) {
+            tasks[dateString].forEach((task, index) => {
+                const card = document.createElement('div');
+                card.className = 'event-card';
+                card.style.backgroundColor = task.color;
+                card.onclick = () => openBookViewAt(dateString, index);
+                
+                let workersText = task.workers ? task.workers.map(w => w.name).join(', ') : 'Nepoznato';
+                card.innerHTML = `
+                    <div style="font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 3px; margin-bottom: 4px;">
+                        👥 ${workersText}
+                    </div>
+                    <div style="font-size: 0.8em;">📍 Lokacija: ${task.locations[0].address} ${task.locations.length > 1 ? `(+ još ${task.locations.length - 1})` : ''}</div>
+                `;
+                list.appendChild(card);
             });
-        };
+        }
+    }
 
-        window.deleteServiser = function(sKey) {
-            if (confirm('Da li ste sigurni da želite da obrišete ovog servisera?')) {
-                remove(ref(db, 'serviseri/' + sKey));
-            }
-        };
+    function openAddModal(date) {
+        if (userRole !== 'admin') return;
+        document.getElementById('eventModal').style.display = 'flex';
+        document.getElementById('eventDate').value = date;
+        const container = document.getElementById('workersCheckboxContainer');
+        container.innerHTML = '';
+        serviseri.forEach(s => {
+            container.innerHTML += `<label style="display:flex;align-items:center;gap:8px;font-size:0.9em;"><input type="checkbox" class="worker-checkbox" value="${s.id}"> <strong>${s.name}</strong> (ID: ${s.id})</label>`;
+        });
+        document.getElementById('locationsContainer').innerHTML = '<label style="font-size:0.85em;font-weight:bold;">Lokacije, vreme i kontakt:</label>';
+        addLocationField();
+    }
 
-        // QR Code Modal
-        window.showQrModal = function(name, sId) {
-            document.getElementById('qr-modal-title').innerText = name;
-            const container = document.getElementById('qrcode-container');
-            container.innerHTML = '';
-            new QRCode(container, {
-                text: `ID:${sId}|Name:${name}`,
-                width: 180,
-                height: 180
+    function addLocationField() {
+        const container = document.getElementById('locationsContainer');
+        const index = container.getElementsByClassName('location-row').length + 1;
+        const row = document.createElement('div');
+        row.className = 'location-row';
+        row.style.cssText = "display: flex; flex-direction: column; gap: 4px; background: rgba(0,0,0,0.03); padding: 8px; border-radius: 4px; margin-bottom: 5px;";
+        row.innerHTML = `
+            <div style="font-size: 0.8em; font-weight: bold; opacity: 0.8;">Lokacija #${index}</div>
+            <input type="text" class="loc-address" placeholder="Adresa lokacije">
+            <div style="display: flex; gap: 5px;">
+                <input type="time" class="loc-time" style="width: 40%;">
+                <input type="text" class="loc-contact" style="width: 60%;" placeholder="Kontakt na lokaciji">
+            </div>
+        `;
+        container.appendChild(row);
+        setTimeout(() => row.getElementsByClassName('loc-address')[0].focus(), 100);
+    }
+
+    function openServiserModal() {
+        document.getElementById('serviserModal').style.display = 'flex';
+        setTimeout(() => document.getElementById('newServiserName').focus(), 100);
+    }
+
+    function saveServiser() {
+        const name = document.getElementById('newServiserName').value.trim();
+        let servId = document.getElementById('newServiserId').value.trim() || Math.floor(100000 + Math.random() * 900000).toString();
+        if (!name) return alert('Unesite ime!');
+        const qr = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ID:${servId}-Name:${encodeURIComponent(name)}`;
+        serviseri.push({ name, id: servId, qr });
+        db.ref('serviseri').set(serviseri);
+        closeModal('serviserModal');
+    }
+
+    function renderServiseriTable() {
+        const tbody = document.querySelector('#serviseriTable tbody');
+        tbody.innerHTML = serviseri.length === 0 ? '<tr><td colspan="4" style="text-align:center;">Nema unetih serviserâ.</td></tr>' : '';
+        serviseri.forEach((s, index) => {
+            const deleteBtn = userRole === 'admin' ? `<td><button class="secondary-btn" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteServiser(${index})">Obriši</button></td>` : '';
+            tbody.innerHTML += `<tr><td><strong>${s.name}</strong></td><td>${s.id}</td><td><img src="${s.qr}" style="width:40px;height:40px;"></td>${deleteBtn}</tr>`;
+        });
+    }
+
+    function deleteServiser(index) {
+        if (confirm('Obrisati servisera?')) { serviseri.splice(index, 1); db.ref('serviseri').set(serviseri); }
+    }
+
+    function openVoziloModal() { document.getElementById('voziloModal').style.display = 'flex'; }
+    function saveVozilo() {
+        const model = document.getElementById('newVoziloModel').value.trim();
+        const reg = document.getElementById('newVoziloReg').value.trim();
+        if(!model || !reg) return;
+        vozila.push({ model, reg });
+        db.ref('vozila').set(vozila);
+        closeModal('voziloModal');
+    }
+
+    function renderVozilaTable() {
+        const tbody = document.querySelector('#vozilaTable tbody');
+        tbody.innerHTML = vozila.length === 0 ? '<tr><td colspan="3" style="text-align:center;">Nema vozila.</td></tr>' : '';
+        vozila.forEach((v, index) => {
+            const deleteBtn = userRole === 'admin' ? `<td><button class="secondary-btn" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteVozilo(${index})">Obriši</button></td>` : '';
+            tbody.innerHTML += `<tr><td><strong>${v.model}</strong></td><td>${v.reg}</td>${deleteBtn}</tr>`;
+        });
+    }
+
+    function deleteVozilo(index) { if (confirm('Obrisati vozilo?')) { vozila.splice(index, 1); db.ref('vozila').set(vozila); } }
+
+    function openRegistracijaModal() {
+        document.getElementById('registracijaModal').style.display = 'flex';
+        const select = document.getElementById('regVoziloSelect');
+        select.innerHTML = '';
+        vozila.forEach((v, idx) => select.innerHTML += `<option value="${idx}">${v.model} (${v.reg})</option>`);
+    }
+
+    function saveRegistracija() {
+        const idx = document.getElementById('regVoziloSelect').value;
+        const expiryDate = document.getElementById('newRegDate').value;
+        if(!expiryDate) return;
+        registracije.push({ voziloModel: vozila[idx].model, voziloReg: vozila[idx].reg, expiryDate });
+        db.ref('registracije').set(registracije);
+        closeModal('registracijaModal');
+    }
+
+    function renderRegistracijeTable() {
+        const tbody = document.querySelector('#registracijeTable tbody');
+        tbody.innerHTML = registracije.length === 0 ? '<tr><td colspan="5" style="text-align:center;">Nema registracija.</td></tr>' : '';
+        const danas = new Date();
+        registracije.forEach((r, index) => {
+            const istekla = new Date(r.expiryDate) < danas;
+            const statusStyle = istekla ? 'color:#ef4444;font-weight:bold;' : 'color:#22c55e;font-weight:bold;';
+            const statusText = istekla ? 'ISTEKLO' : 'Aktivno';
+            const actions = userRole === 'admin' ? `<td>
+                <button class="secondary-btn" style="background:#2563eb;padding:4px 8px;font-size:0.8em;" onclick="produziRegistraciju(${index})">Produži 1 god</button>
+                <button class="secondary-btn" style="background:#ef4444;padding:4px 8px;font-size:0.8em;" onclick="deleteRegistracija(${index})">Obriši</button>
+            </td>` : '';
+            tbody.innerHTML += `<tr><td><strong>${r.voziloModel}</strong></td><td>${r.voziloReg}</td><td>${r.expiryDate}</td><td style="${statusStyle}">${statusText}</td>${actions}</tr>`;
+        });
+    }
+
+    function produziRegistraciju(index) {
+        let r = registracije[index];
+        let d = new Date(r.expiryDate);
+        d.setFullYear(d.getFullYear() + 1);
+        r.expiryDate = d.toISOString().split('T')[0];
+        db.ref('registracije').set(registracije);
+    }
+
+    function deleteRegistracija(index) { if (confirm('Obrisati?')) { registracije.splice(index, 1); db.ref('registracije').set(registracije); } }
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    function saveTask() {
+        const date = document.getElementById('eventDate').value;
+        const color = document.getElementById('eventColor').value;
+        const checkboxes = document.querySelectorAll('.worker-checkbox:checked');
+        let selectedWorkers = [];
+        checkboxes.forEach(cb => {
+            const s = serviseri.find(item => item.id === cb.value);
+            if (s) selectedWorkers.push(s);
+        });
+
+        if (selectedWorkers.length === 0) return alert('Izaberite servisere!');
+
+        const rows = document.getElementsByClassName('location-row');
+        let locations = [];
+        for (let row of rows) {
+            const address = row.getElementsByClassName('loc-address')[0].value.trim();
+            const time = row.getElementsByClassName('loc-time')[0].value;
+            const contact = row.getElementsByClassName('loc-contact')[0].value.trim();
+            if (address) locations.push({ address, time, contact });
+        }
+
+        if (locations.length === 0) return alert('Uneti bar jednu lokaciju!');
+
+        if (!tasks[date]) tasks[date] = [];
+        tasks[date].push({ id: Date.now().toString(), workers: selectedWorkers, locations, color });
+        db.ref('tasks').set(tasks);
+        closeModal('eventModal');
+    }
+
+    function openBookView(dateString) { openBookViewAt(dateString, 0); }
+    function openBookViewAt(dateString, index) {
+        if (!tasks[dateString] || tasks[dateString].length === 0) return;
+        currentBookDate = dateString;
+        currentBookIndex = index;
+        document.getElementById('bookModal').style.display = 'flex';
+        renderBookCard();
+    }
+
+    function changeBookCard(direction) {
+        const dayTasks = tasks[currentBookDate];
+        if (!dayTasks) return;
+        currentBookIndex += direction;
+        if (currentBookIndex < 0) currentBookIndex = dayTasks.length - 1;
+        if (currentBookIndex >= dayTasks.length) currentBookIndex = 0;
+        renderBookCard();
+    }
+
+    function renderBookCard() {
+        const dayTasks = tasks[currentBookDate];
+        const body = document.getElementById('bookModalBody');
+        const counter = document.getElementById('bookCounter');
+        const navControls = document.getElementById('bookNavControls');
+
+        if (!dayTasks || dayTasks.length === 0) { closeModal('bookModal'); return; }
+
+        navControls.style.display = dayTasks.length > 1 ? 'flex' : 'none';
+        counter.innerText = `${currentBookIndex + 1} / ${dayTasks.length}`;
+
+        const task = dayTasks[currentBookIndex];
+        let workersHtml = '';
+        if (task.workers) {
+            task.workers.forEach((w, idx) => {
+                workersHtml += `<div class="qr-badge" style="margin-bottom:6px;"><img src="${w.qr}"><div><h4>👤 S${idx + 1}: ${w.name}</h4><div style="font-size:0.85em;opacity:0.8;">ID: <strong>${w.id}</strong></div></div></div>`;
             });
-            document.getElementById('qr-modal').classList.remove('hidden');
-        };
+        }
 
-        window.closeQrModal = function() {
-            document.getElementById('qr-modal').classList.add('hidden');
-        };
-    </script>
+        let locationsHtml = '';
+        if (task.locations) {
+            task.locations.forEach((loc, idx) => {
+                locationsHtml += `<div style="background:rgba(0,0,0,0.03);padding:6px;border-radius:4px;margin-top:4px;"><div><strong>#${idx + 1} Adresa:</strong> ${loc.address}</div><div><strong>Vreme:</strong> ${loc.time || 'Nije fiksirano'}</div><div><strong>Kontakt:</strong> ${loc.contact || 'Nema kontakta'}</div></div>`;
+            });
+        }
+
+        const deleteBtn = userRole === 'admin' ? `<button class="secondary-btn" style="background-color:#ef4444;margin-top:10px;" onclick="deleteTask('${currentBookDate}', ${currentBookIndex})">Obriši ovo zaduženje</button>` : '';
+
+        body.innerHTML = `
+            <div class="task-detail-card" style="border-left: 5px solid ${task.color};">
+                <div style="font-weight: bold; margin-bottom: 5px;">Članovi tima:</div>
+                ${workersHtml}
+                <div style="margin-top: 10px; font-weight: bold;">Raspored lokacija:</div>
+                <div style="max-height: 150px; overflow-y: auto;">${locationsHtml}</div>
+                ${deleteBtn}
+            </div>`;
+    }
+
+    function deleteTask(dateString, index) {
+        if (userRole !== 'admin') return;
+        if (confirm('Obrisati zaduženje?')) {
+            tasks[dateString].splice(index, 1);
+            if (tasks[dateString].length === 0) delete tasks[dateString];
+            db.ref('tasks').set(tasks);
+        }
+    }
+</script>
 </body>
 </html>
