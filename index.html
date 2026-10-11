@@ -163,7 +163,7 @@
         <!-- SERVISERI VIEW -->
         <div id="view-serviseri" class="main-view">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h2>Spisak Servisera</h2>
+                <h2>Upravljanje Serviserima</h2>
                 <button class="secondary-btn admin-only" onclick="openServiserModal()">+ Dodaj novog servisera</button>
             </div>
             <div style="overflow-x: auto;">
@@ -344,7 +344,7 @@
     let tasks = {}, serviseri = [], vozila = [], registracije = [];
     let currentBookDate = '', currentBookIndex = 0;
     let currentSelectedWorkers = [];
-    const daysInWeek = ['PON', 'UTO', 'SRE', 'ČET', 'PET', 'SUB', 'NED'];
+    const daysInWeek = ['Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja'];
 
     auth.onAuthStateChanged(user => {
         if (user) {
@@ -466,7 +466,7 @@
 
             const col = document.createElement('div');
             col.className = 'day-column';
-            const displayDate = currentDay.toLocaleDateString('sr-RS', {day: 'numeric', month: 'numeric', year: 'numeric'});
+            const displayDate = currentDay.toLocaleDateString('sr-Latn-RS', {day: 'numeric', month: 'numeric', year: 'numeric'});
             
             const addBtnHtml = userRole === 'admin' ? `<button class="add-task-btn" onclick="openAddModal('${dateString}')">+</button>` : '';
 
@@ -501,11 +501,15 @@
                 
                 let workersText = task.workers ? task.workers.map(w => w.name).join(', ') : 'Nepoznato';
                 let descSnippet = task.description ? `<div style="font-size: 0.8em; opacity: 0.9; margin-top: 2px;">📝 ${task.description}</div>` : '';
+                
+                let firstLoc = task.locations && task.locations.length > 0 ? task.locations[0].address : '';
+                let mapLinkHtml = firstLoc ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(firstLoc)}" target="_blank" style="color: #fff; text-decoration: underline; margin-left: 5px;" onclick="event.stopPropagation()">📍 Mapa</a>` : '';
+
                 card.innerHTML = `
                     <div style="font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 3px; margin-bottom: 4px;">
                         👥 ${workersText}
                     </div>
-                    <div style="font-size: 0.8em;">📍 Lokacija: ${task.locations[0].address} ${task.locations.length > 1 ? `(+ još ${task.locations.length - 1})` : ''}</div>
+                    <div style="font-size: 0.8em;">📍 Lokacija: ${firstLoc} ${mapLinkHtml} ${task.locations.length > 1 ? `(+ još ${task.locations.length - 1})` : ''}</div>
                     ${descSnippet}
                 `;
                 list.appendChild(card);
@@ -805,12 +809,14 @@
         let locationsHtml = '';
         if (task.locations) {
             task.locations.forEach((loc, lIdx) => {
+                const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.address)}`;
                 locationsHtml += `
                     <div class="task-detail-card">
                         <div style="font-weight:bold; color:var(--btn-bg);">Lokacija #${lIdx + 1}</div>
                         <div>📍 Adresa: <strong>${loc.address}</strong></div>
                         <div>⏰ Vreme: <strong>${loc.time || 'Nije uneto'}</strong></div>
                         <div>📞 Kontakt: <strong>${loc.contact || 'Nije uneto'}</strong></div>
+                        <a href="${mapUrl}" target="_blank" class="secondary-btn" style="display: block; margin-top: 8px; text-align: center; text-decoration: none;">📍 Pokreni navigaciju</a>
                     </div>
                 `;
             });
