@@ -432,7 +432,7 @@
     function updateClock() {
         const now = new Date();
         const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-        document.getElementById('clock').innerText = now.toLocaleDateString('sr-RS', options);
+        document.getElementById('clock').innerText = now.toLocaleDateString('sr-Latn-RS', options);
     }
 
     function switchView(viewName) {
